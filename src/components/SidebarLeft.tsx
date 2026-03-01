@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Settings, Type, List, AlignLeft, AlignCenter, AlignRight, AlignJustify, Moon, Sun, Palette } from "lucide-react";
+import { Settings, Type, List, AlignLeft, AlignCenter, AlignRight, AlignJustify, Moon, Sun, Palette, Bold, Italic, Underline, Strikethrough } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 
@@ -14,6 +14,12 @@ export function SidebarLeft() {
   const { theme, setTheme } = useTheme(); // Hook untuk mengubah mode Terang/Gelap
   const [mounted, setMounted] = useState(false);
   const [fontColor, setFontColor] = useState("#000000");
+
+  //Kumpulan state untuk advanced
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
+  const [isStrikethrough, setIsStrikethrough] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -52,6 +58,23 @@ export function SidebarLeft() {
   const handleFontColorChange = (color: string) => {
     setFontColor(color);
   };
+
+  // Function untuk format teks advanced (dipanggil di tombol sidebar)
+  const setAdvanced = (command: string) => {
+    // Fokuskan ke editor jika belum fokus (agar bisa ngetik setelah klik sidebar)
+    const editor = document.getElementById("main-editor");
+    if (editor && document.activeElement !== editor) editor.focus();
+
+    // Tembakkan command format teksnya
+    document.execCommand(command, false);
+
+    // Update state tombol supaya UI-nya nyala/mati berdasarkan kondisi riil di browser
+    if (command === "bold") setIsBold(document.queryCommandState("bold"));
+    if (command === "italic") setIsItalic(document.queryCommandState("italic"));
+    if (command === "underline") setIsUnderline(document.queryCommandState("underline"));
+    if (command === "strikeThrough") setIsStrikethrough(document.queryCommandState("strikeThrough"));
+  };
+
 
 
   return (
@@ -98,7 +121,7 @@ export function SidebarLeft() {
         {/* Font Size Slider */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Size</label>
+            <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Font Size</label>
             <span className="text-xs text-zinc-400">{fontSize}px</span>
           </div>
           <input
@@ -198,6 +221,31 @@ export function SidebarLeft() {
                 key={id}
                 onClick={() => setTextAlign(id)}
                 className={`flex-1 py-1.5 rounded-md flex justify-center transition-colors ${textAlign === id
+                  ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-900 hover:bg-white/50 dark:hover:bg-zinc-700/50 dark:hover:text-white"
+                  }`}
+              >
+                <Icon className="w-4 h-4" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Advanced */}
+        <div className="space-y-3">
+          <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Advanced</label>
+          <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800/50 rounded-lg">
+            {[
+              { id: "bold", icon: Bold, isActive: isBold },
+              { id: "italic", icon: Italic, isActive: isItalic },
+              { id: "underline", icon: Underline, isActive: isUnderline },
+              { id: "strikeThrough", icon: Strikethrough, isActive: isStrikethrough }
+            ].map(({ id, icon: Icon, isActive }) => (
+              <button
+                key={id}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setAdvanced(id)}
+                className={`flex-1 py-1.5 rounded-md flex justify-center transition-colors ${isActive
                   ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
                   : "text-zinc-500 hover:text-zinc-900 hover:bg-white/50 dark:hover:bg-zinc-700/50 dark:hover:text-white"
                   }`}

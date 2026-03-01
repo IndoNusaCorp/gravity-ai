@@ -88,6 +88,10 @@ export default function Home() {
                 color: "var(--editor-font-color, #000000)",
               }}
             />
+
+
+
+
           </div>
 
           {/* Overlay Content Area (Chat & Search) */}
