@@ -2,9 +2,13 @@
 
 import { motion } from "framer-motion";
 import { Settings, Printer, Palette, Layers, FileText, Image } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
-export function SidebarRight() {
+interface SidebarRightProps {
+    onImageUpload?: (src: string) => void;
+}
+
+export function SidebarRight({ onImageUpload }: SidebarRightProps) {
     // State untuk menyimpan warna kertas
     const [paperColor, setPaperColor] = useState("#ffffff");
     // State untuk menyimpan jenis/ukuran kertas (default A4)
@@ -56,6 +60,32 @@ export function SidebarRight() {
             document.documentElement.style.setProperty('--paper-max-width', selectedPaper.width);
         }
     }, [paperColor, paperType]);
+
+    //fungsi upload image
+    // File input ref for image upload
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    //fungsi trigger file input
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (e.target?.result && onImageUpload) {
+                    onImageUpload(e.target.result as string);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+        // Reset input value supaya gambar yang sama bisa dipilih lagi jika perlu
+        if (event.target) {
+            event.target.value = '';
+        }
+    };
 
     return (
         <motion.div
@@ -136,7 +166,17 @@ export function SidebarRight() {
                         <Image className="w-3.5 h-3.5" /> Upload Image
                     </label>
                     <div className="grid grid-cols-2 gap-2">
-                        <button className="py-2.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                        <input
+                            type="file"
+                            accept="image/png, image/jpeg, image/jpg, image/webp, image/heic"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            className="hidden"
+                        />
+                        <button
+                            onClick={handleUploadClick}
+                            className="py-2.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                        >
                             Upload Image
                         </button>
                     </div>

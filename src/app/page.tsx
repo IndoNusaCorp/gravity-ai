@@ -16,6 +16,22 @@ export default function Home() {
   // State untuk menyimpan pesan terakhir yang dikirim pengguna ke AI
   const [chatMessage, setChatMessage] = useState("");
 
+  // State untuk menyimpan gambar yang diupload ke atas kertas
+  const [uploadedImages, setUploadedImages] = useState<{ id: string; src: string; x: number; y: number }[]>([]);
+
+  // Fungsi yang dipanggil saat ada gambar yang diupload dari SidebarRight
+  const handleImageUpload = (src: string) => {
+    setUploadedImages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        src: src,
+        x: 100, // Mulai dari posisi X: 100
+        y: 100, // Mulai dari posisi Y: 100
+      },
+    ]);
+  };
+
   // Fungsi yang dipanggil saat pengguna mengirim pesan ke AI
   const handleStart = () => {
     // Memastikan input tidak kosong
@@ -41,7 +57,7 @@ export default function Home() {
     <div className="relative flex flex-col items-center min-h-screen bg-zinc-50 dark:bg-zinc-950 font-sans overflow-x-hidden py-12 transition-colors duration-300">
       {/* Sidebars */}
       <SidebarLeft />
-      <SidebarRight />
+      <SidebarRight onImageUpload={handleImageUpload} />
 
       {/* Main Content Area */}
       <main className="relative z-10 w-full flex flex-col items-center justify-start sm:p-4 transition-all duration-500 min-h-[85vh]">
@@ -63,36 +79,58 @@ export default function Home() {
         >
 
           {/* Typable Document Area (Area Tempat Mengetik Naskah) */}
-          <div className="absolute inset-0 w-full h-full bg-transparent overflow-hidden z-10">
-            <style>{`
-              #main-editor:empty:before {
-                content: attr(data-placeholder);
-                color: #d4d4d8; /* text-zinc-300 */
-                pointer-events: none;
-              }
-              .dark #main-editor:empty:before {
-                color: rgba(63, 63, 70, 0.5); /* dark:text-zinc-700/50 */
-              }
-            `}</style>
-            <div
-              id="main-editor"
-              contentEditable
-              suppressContentEditableWarning
-              className="w-full h-full outline-none py-16 pr-12 pl-24 text-zinc-900 dark:text-zinc-100 scrollbar-hide overflow-y-auto whitespace-pre-wrap focus:outline-none"
-              data-placeholder="Mulai menulis naskah atau klik area ini..."
-              style={{
-                fontFamily: "var(--editor-font-family, 'Inter')",
-                fontSize: "var(--editor-font-size, 16px)",
-                fontWeight: "var(--editor-font-weight, 400)",
-                textAlign: "var(--editor-text-align, start)" as any,
-                color: "var(--editor-font-color, #000000)",
-              }}
-            />
+          <style>{`
+            #main-editor:empty:before {
+              content: attr(data-placeholder);
+              color: #d4d4d8; /* text-zinc-300 */
+              pointer-events: none;
+            }
+            .dark #main-editor:empty:before {
+              color: rgba(63, 63, 70, 0.5); /* dark:text-zinc-700/50 */
+            }
+          `}</style>
+          <div
+            id="main-editor"
+            contentEditable
+            suppressContentEditableWarning
+            className="absolute inset-0 w-full h-full outline-none py-16 pr-12 pl-24 text-zinc-900 dark:text-zinc-100 scrollbar-hide overflow-y-auto whitespace-pre-wrap focus:outline-none z-10"
+            data-placeholder="Mulai menulis naskah atau klik area ini..."
+            style={{
+              fontFamily: "var(--editor-font-family, 'Inter')",
+              fontSize: "var(--editor-font-size, 16px)",
+              fontWeight: "var(--editor-font-weight, 400)",
+              textAlign: "var(--editor-text-align, start)" as any,
+              color: "var(--editor-font-color, #000000)",
+            }}
+          />
 
-
-
-
-          </div>
+          {/* Draggable Images */}
+          {uploadedImages.map((img) => (
+            <motion.div
+              key={img.id}
+              drag
+              dragMomentum={false}
+              initial={{ x: img.x, y: img.y }}
+              className="absolute z-50 cursor-move group"
+              style={{ touchAction: "none" }}
+            >
+              <div className="relative">
+                <img
+                  src={img.src}
+                  alt="Uploaded content"
+                  className="max-w-[300px] max-h-[300px] object-contain rounded-lg shadow-sm border border-transparent group-hover:border-zinc-300 dark:group-hover:border-zinc-700 transition-colors pointer-events-auto"
+                  draggable={false} // Mencegah perilaku drag bawaan browser pada gambar
+                />
+                {/* Delete button (only visible on hover) */}
+                <button
+                  onClick={() => setUploadedImages(prev => prev.filter(i => i.id !== img.id))}
+                  className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 pointer-events-auto"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </motion.div>
+          ))}
 
           {/* Overlay Content Area (Chat & Search) */}
           <div className="absolute inset-0 z-20 flex flex-col pointer-events-none p-6 sm:p-12 justify-end">
