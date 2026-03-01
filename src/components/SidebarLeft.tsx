@@ -8,7 +8,7 @@ import { useTheme } from "next-themes";
 export function SidebarLeft() {
   // Kumpulan State untuk menyimpan pengaturan gaya tulisan dan warna saat ini
   const [fontSize, setFontSize] = useState(16);
-  const [fontFamily, setFontFamily] = useState("Inter");
+  const [fontFamily, setFontFamily] = useState("Arial");
   const [fontWeight, setFontWeight] = useState(400);
   const [textAlign, setTextAlign] = useState("left");
   const { theme, setTheme } = useTheme(); // Hook untuk mengubah mode Terang/Gelap
@@ -19,15 +19,18 @@ export function SidebarLeft() {
     setMounted(true);
   }, []);
 
-  // Effect ini akan berjalan setiap kali ukuran, jenis, tebal, atau perataan teks (alignment) diubah.
-  // Dia memanggil CSS Variable di HTML utama agar kertas/textarea di file page.tsx tampilannya ikut berubah seketika.
+  // Effect ini berjalan untuk mengatur global style awal editor
   useEffect(() => {
-    // Inject typography CSS variables to be consumed by the paper
     document.documentElement.style.setProperty('--editor-font-size', `${fontSize}px`);
-    document.documentElement.style.setProperty('--editor-font-family', fontFamily === "Times New Roman" ? "serif" : fontFamily);
     document.documentElement.style.setProperty('--editor-font-weight', fontWeight.toString());
     document.documentElement.style.setProperty('--editor-text-align', textAlign);
-  }, [fontSize, fontFamily, fontWeight, textAlign]);
+  }, [fontSize, fontWeight, textAlign]);
+
+  useEffect(() => {
+    // Set fallback awal
+    document.documentElement.style.setProperty('--editor-font-family', 'Inter');
+    document.documentElement.style.setProperty('--editor-font-color', '#000000');
+  }, []);
 
   // Effect untuk mengganti tema (Terang / Gelap) dari situs secara langsung.
   useEffect(() => {
@@ -50,6 +53,7 @@ export function SidebarLeft() {
     setFontColor(color);
   };
 
+
   return (
     <motion.div
       initial={{ x: -300, opacity: 0 }}
@@ -69,10 +73,16 @@ export function SidebarLeft() {
         <div className="space-y-3">
           <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Typography</label>
           <div className="grid grid-cols-1 gap-2">
-            {["Inter", "Times New Roman", "Geist", "Georgia"].map((font) => (
+            {["Inter", "Times New Roman", "Geist", "Georgia", "Arial", "Courier New"].map((font) => (
               <button
                 key={font}
-                onClick={() => setFontFamily(font)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setFontFamily(font);
+                  const editor = document.getElementById("main-editor");
+                  if (editor && document.activeElement !== editor) editor.focus();
+                  document.execCommand("fontName", false, font === "Times New Roman" ? "Times New Roman, serif" : font);
+                }}
                 className={`py-2 px-3 rounded-lg text-left text-sm transition-all duration-200 ${fontFamily === font
                   ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium"
                   : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
@@ -137,7 +147,13 @@ export function SidebarLeft() {
               {["#000000", "#52525b", "#ef4444", "#3b82f6", "#10b981"].map((color) => (
                 <button
                   key={color}
-                  onClick={() => setFontColor(color)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setFontColor(color);
+                    const editor = document.getElementById("main-editor");
+                    if (editor && document.activeElement !== editor) editor.focus();
+                    document.execCommand("foreColor", false, color);
+                  }}
                   className={`w-full aspect-square rounded-full border-2 transition-transform duration-200 ${fontColor === color
                     ? "border-zinc-400 dark:border-zinc-500 scale-110 shadow-sm"
                     : "border-zinc-200 dark:border-zinc-700 hover:scale-105"
@@ -154,7 +170,12 @@ export function SidebarLeft() {
               <input
                 type="color"
                 value={fontColor}
-                onChange={(e) => setFontColor(e.target.value)}
+                onChange={(e) => {
+                  setFontColor(e.target.value);
+                  const editor = document.getElementById("main-editor");
+                  if (editor && document.activeElement !== editor) editor.focus();
+                  document.execCommand("foreColor", false, e.target.value);
+                }}
                 className="absolute inset-[-10px] w-[300%] h-[300%] cursor-pointer opacity-0"
                 title="Choose custom color"
               />

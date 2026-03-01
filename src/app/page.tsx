@@ -61,23 +61,34 @@ export default function Home() {
             width: "100%"
           }}
         >
-          {/* Paper margin lines */}
-          <div className="absolute top-0 bottom-0 left-12 w-px bg-red-400/30 dark:bg-red-900/40 z-0 pointer-events-none" />
-          <div className="absolute top-0 bottom-0 left-[3.25rem] w-px bg-red-400/30 dark:bg-red-900/40 z-0 pointer-events-none" />
 
           {/* Typable Document Area (Area Tempat Mengetik Naskah) */}
-          <textarea
-            className="absolute inset-0 w-full h-full bg-transparent resize-none outline-none py-16 pr-12 pl-24 z-10 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-300 dark:placeholder:text-zinc-700/50 scrollbar-hide"
-            placeholder="Mulai menulis naskah atau klik area ini..."
-            style={{
-              // Mengambil pengaturan gaya tulisan (font, ukuran, tebal, rata teks, warna) dari SidebarLeft (menggunakan CSS Variables)
-              fontFamily: "var(--editor-font-family, 'Inter')",
-              fontSize: "var(--editor-font-size, 16px)",
-              fontWeight: "var(--editor-font-weight, 400)",
-              textAlign: "var(--editor-text-align, start)" as any,
-              color: "var(--editor-font-color, #000000)",
-            }}
-          />
+          <div className="absolute inset-0 w-full h-full bg-transparent overflow-hidden z-10">
+            <style>{`
+              #main-editor:empty:before {
+                content: attr(data-placeholder);
+                color: #d4d4d8; /* text-zinc-300 */
+                pointer-events: none;
+              }
+              .dark #main-editor:empty:before {
+                color: rgba(63, 63, 70, 0.5); /* dark:text-zinc-700/50 */
+              }
+            `}</style>
+            <div
+              id="main-editor"
+              contentEditable
+              suppressContentEditableWarning
+              className="w-full h-full outline-none py-16 pr-12 pl-24 text-zinc-900 dark:text-zinc-100 scrollbar-hide overflow-y-auto whitespace-pre-wrap focus:outline-none"
+              data-placeholder="Mulai menulis naskah atau klik area ini..."
+              style={{
+                fontFamily: "var(--editor-font-family, 'Inter')",
+                fontSize: "var(--editor-font-size, 16px)",
+                fontWeight: "var(--editor-font-weight, 400)",
+                textAlign: "var(--editor-text-align, start)" as any,
+                color: "var(--editor-font-color, #000000)",
+              }}
+            />
+          </div>
 
           {/* Overlay Content Area (Chat & Search) */}
           <div className="absolute inset-0 z-20 flex flex-col pointer-events-none p-6 sm:p-12 justify-end">
