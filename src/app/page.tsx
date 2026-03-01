@@ -7,15 +7,21 @@ import { Search, Send, X } from "lucide-react";
 import { useState } from "react";
 
 export default function Home() {
+  // State untuk melacak apakah input sedang fokus (diklik)
   const [isFocused, setIsFocused] = useState(false);
+  // State untuk melacak apakah obrolan dengan AI sedang aktif/terbuka
   const [isChatActive, setIsChatActive] = useState(false);
+  // State untuk menyimpan teks yang diketik pengguna di kolom pencarian/input
   const [inputValue, setInputValue] = useState("");
+  // State untuk menyimpan pesan terakhir yang dikirim pengguna ke AI
   const [chatMessage, setChatMessage] = useState("");
 
+  // Fungsi yang dipanggil saat pengguna mengirim pesan ke AI
   const handleStart = () => {
+    // Memastikan input tidak kosong
     if (inputValue.trim()) {
-      setChatMessage(inputValue);
-      setIsChatActive(true);
+      setChatMessage(inputValue); // Menyimpan pesan untuk ditampilkan di chat
+      setIsChatActive(true); // Menampilkan kotak obrolan AI
     }
   };
 
@@ -40,14 +46,16 @@ export default function Home() {
       {/* Main Content Area */}
       <main className="relative z-10 w-full flex flex-col items-center justify-start sm:p-4 transition-all duration-500 min-h-[85vh]">
 
-        {/* Paper Editor Container */}
+        {/* Paper Editor Container (Wadah Kertas Utama) */}
+        {/* motion.div digunakan agar kertas muncul dengan animasi yang mulus */}
         <motion.div
           layout
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="relative flex flex-col bg-white dark:bg-zinc-900 shadow-2xl rounded-sm border border-zinc-200/80 dark:border-zinc-800 z-10 transition-all duration-500 ease-in-out overflow-hidden w-[calc(100%-2rem)] sm:w-full min-h-[85vh]"
+          className="relative flex flex-col bg-white dark:bg-zinc-900 shadow-2xl rounded-sm border border-zinc-200/80 dark:border-zinc-800 z-10 transition-all duration-500 ease-in-out w-[calc(100%-2rem)] sm:w-full min-h-[85vh]"
           style={{
+            // Mengambil warna dan lebar kertas dari pengaturan di SidebarRight (menggunakan CSS Variables)
             backgroundColor: "var(--paper-color, #ffffff)",
             maxWidth: "var(--paper-max-width, 794px)", // 794px is A4 width
             width: "100%"
@@ -57,11 +65,12 @@ export default function Home() {
           <div className="absolute top-0 bottom-0 left-12 w-px bg-red-400/30 dark:bg-red-900/40 z-0 pointer-events-none" />
           <div className="absolute top-0 bottom-0 left-[3.25rem] w-px bg-red-400/30 dark:bg-red-900/40 z-0 pointer-events-none" />
 
-          {/* Typable Document Area */}
+          {/* Typable Document Area (Area Tempat Mengetik Naskah) */}
           <textarea
             className="absolute inset-0 w-full h-full bg-transparent resize-none outline-none py-16 pr-12 pl-24 z-10 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-300 dark:placeholder:text-zinc-700/50 scrollbar-hide"
             placeholder="Mulai menulis naskah atau klik area ini..."
             style={{
+              // Mengambil pengaturan gaya tulisan (font, ukuran, tebal, rata teks, warna) dari SidebarLeft (menggunakan CSS Variables)
               fontFamily: "var(--editor-font-family, 'Inter')",
               fontSize: "var(--editor-font-size, 16px)",
               fontWeight: "var(--editor-font-weight, 400)",
@@ -113,7 +122,7 @@ export default function Home() {
             {/* Search Input Container */}
             <motion.div
               layout
-              className={`w-full max-w-xl mx-auto relative group shrink-0 pointer-events-auto transition-all duration-700 ease-[0.16,1,0.3,1] ${!isChatActive ? "translate-y-[0vh]" : ""}`}
+              className={`w-full max-w-xl mx-auto relative z-50 group shrink-0 pointer-events-auto transition-all duration-700 ease-[0.16,1,0.3,1] ${!isChatActive ? "translate-y-[12vh]" : ""}`}
             >
               <div className={`absolute inset-0 bg-zinc-900/5 dark:bg-white/5 rounded-2xl blur-xl transition-all duration-300 ${isFocused ? "opacity-100 scale-105" : "opacity-0 scale-100"}`} />
 
@@ -122,14 +131,15 @@ export default function Home() {
                   <Search className={`w-5 h-5 transition-colors duration-300 ${isFocused ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`} />
                 </div>
 
+                {/* Input Teks untuk ngobrol dengan AI */}
                 <input
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
+                  onKeyDown={handleKeyDown} // Menjalankan fungsi saat tombol (seperti Enter) ditekan
                   placeholder="Tanya LibraAI atau minta bantuan menulis..."
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
+                  onFocus={() => setIsFocused(true)} // Mengubah state fokus saat input diklik
+                  onBlur={() => setIsFocused(false)} // Mengubah state saat input ditinggalkan
                   className="w-full bg-transparent border-none outline-none py-3 pr-4 text-zinc-900 dark:text-white placeholder:text-zinc-400 text-sm font-medium"
                 />
 

@@ -6,11 +6,12 @@ import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 
 export function SidebarLeft() {
+  // Kumpulan State untuk menyimpan pengaturan gaya tulisan dan warna saat ini
   const [fontSize, setFontSize] = useState(16);
   const [fontFamily, setFontFamily] = useState("Inter");
   const [fontWeight, setFontWeight] = useState(400);
   const [textAlign, setTextAlign] = useState("left");
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme(); // Hook untuk mengubah mode Terang/Gelap
   const [mounted, setMounted] = useState(false);
   const [fontColor, setFontColor] = useState("#000000");
 
@@ -18,6 +19,8 @@ export function SidebarLeft() {
     setMounted(true);
   }, []);
 
+  // Effect ini akan berjalan setiap kali ukuran, jenis, tebal, atau perataan teks (alignment) diubah.
+  // Dia memanggil CSS Variable di HTML utama agar kertas/textarea di file page.tsx tampilannya ikut berubah seketika.
   useEffect(() => {
     // Inject typography CSS variables to be consumed by the paper
     document.documentElement.style.setProperty('--editor-font-size', `${fontSize}px`);
@@ -26,6 +29,7 @@ export function SidebarLeft() {
     document.documentElement.style.setProperty('--editor-text-align', textAlign);
   }, [fontSize, fontFamily, fontWeight, textAlign]);
 
+  // Effect untuk mengganti tema (Terang / Gelap) dari situs secara langsung.
   useEffect(() => {
     // Force dark mode implementation to really work
     if (theme === 'dark') {
@@ -37,6 +41,7 @@ export function SidebarLeft() {
     }
   }, [theme]);
 
+  // Effect khusus untuk warna tulisan. Jika fontColor berubah, otomatis CSS variable diupdate.
   useEffect(() => {
     document.documentElement.style.setProperty('--editor-font-color', fontColor);
   }, [fontColor]);

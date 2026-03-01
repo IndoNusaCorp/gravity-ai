@@ -5,10 +5,12 @@ import { Settings, Printer, Palette, Layers, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function SidebarRight() {
+    // State untuk menyimpan warna kertas
     const [paperColor, setPaperColor] = useState("#ffffff");
+    // State untuk menyimpan jenis/ukuran kertas (default A4)
     const [paperType, setPaperType] = useState("a4");
 
-    //type of paper (30 types)
+    // Daftar semua jenis/ukuran kertas yang tersedia (ada 30 jenis) beserta ukurannya dalam piksel
     const paperTypes = [
         { value: "a4", label: "A4 (210 x 297 mm)", width: "794px" },
         { value: "a3", label: "A3 (297 x 420 mm)", width: "1123px" },
@@ -42,6 +44,9 @@ export function SidebarRight() {
         { value: "ledger", label: "Ledger", width: "1632px" },
     ];
 
+    // Effect ini berjalan jika pengguna mengganti warna atau jenis kertas.
+    // Ia akan mengatur "CSS variables" (lebar kertas & warnanya) di HTML.
+    // Karena layout kertas di page.tsx menggunakan CSS variables ini, kertasnya akan berubah ukuran dan warna seketika!
     useEffect(() => {
         document.documentElement.style.setProperty('--paper-color', paperColor);
         const selectedPaper = paperTypes.find(p => p.value === paperType);
