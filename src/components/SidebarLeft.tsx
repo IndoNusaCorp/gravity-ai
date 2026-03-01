@@ -84,13 +84,6 @@ export function SidebarLeft() {
       transition={{ type: "spring", stiffness: 100, damping: 20 }}
       className="fixed left-0 top-0 h-full w-72 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-zinc-200 dark:border-zinc-800 p-6 z-40 hidden md:block pt-20"
     >
-      <div className="flex items-center gap-2 mb-8">
-        <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-          <Type className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
-        </div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-锌-100">Text Features</h2>
-      </div>
-
       <div className="space-y-8">
         {/* Font Family Selection */}
         <div className="space-y-3">

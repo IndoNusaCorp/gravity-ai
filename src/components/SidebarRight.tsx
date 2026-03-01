@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Settings, Printer, Palette, Layers, FileText } from "lucide-react";
+import { Settings, Printer, Palette, Layers, FileText, Image } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function SidebarRight() {
@@ -9,6 +9,8 @@ export function SidebarRight() {
     const [paperColor, setPaperColor] = useState("#ffffff");
     // State untuk menyimpan jenis/ukuran kertas (default A4)
     const [paperType, setPaperType] = useState("a4");
+
+    const [uploadImage, setUploadImage] = useState<string | null>(null);
 
     // Daftar semua jenis/ukuran kertas yang tersedia (ada 30 jenis) beserta ukurannya dalam piksel
     const paperTypes = [
@@ -124,6 +126,18 @@ export function SidebarRight() {
                         </button>
                         <button className="py-2.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-500">
                             Grid
+                        </button>
+                    </div>
+                </div>
+
+                {/* Upload Image */}
+                <div className="space-y-3">
+                    <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                        <Image className="w-3.5 h-3.5" /> Upload Image
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <button className="py-2.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                            Upload Image
                         </button>
                     </div>
                 </div>
