@@ -23,6 +23,45 @@ export function SidebarLeft() {
 
   useEffect(() => {
     setMounted(true);
+
+    // Otomatis sinkronkan opsi format saat kursor/seleksi berubah di editor
+    const handleSelectionChange = () => {
+      // Hanya berjalan jika kursor ada di editor naskah
+      const editor = document.getElementById("main-editor");
+      if (!editor || document.activeElement !== editor) return;
+
+      setIsBold(document.queryCommandState("bold"));
+      setIsItalic(document.queryCommandState("italic"));
+      setIsUnderline(document.queryCommandState("underline"));
+      setIsStrikethrough(document.queryCommandState("strikeThrough"));
+
+      // Sinkronkan Warna (ubah dari format rgb ke hex)
+      const foreColor = document.queryCommandValue("foreColor");
+      if (foreColor) {
+        // queryCommandValue("foreColor") terkadang me-return "rgb(R, G, B)" atau angka integer, 
+        // kita butuh helper untuk convert ke "#RRGGBB" jika formatnya rgb
+        const rgbToHex = (str: string) => {
+          const match = str.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+          if (!match) return str; // Jika bukan format rgb, return as is (bisa hex atau color name yg tersimpan)
+          const hex = (x: string) => ("0" + parseInt(x).toString(16)).slice(-2);
+          return "#" + hex(match[1]) + hex(match[2]) + hex(match[3]);
+        };
+        setFontColor(rgbToHex(foreColor));
+      }
+
+      // Sinkronkan Font Family
+      const fontQuery = document.queryCommandValue("fontName");
+      if (fontQuery) {
+        // Membersihkan tanda kutip bawaan dari fontName seperti '"Times New Roman"'
+        const cleanedFont = fontQuery.replace(/['"]/g, "").split(",")[0].trim();
+        // Fallback untuk mencocokkan standar di UI
+        if (cleanedFont === "serif") setFontFamily("Times New Roman");
+        else setFontFamily(cleanedFont);
+      }
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => document.removeEventListener("selectionchange", handleSelectionChange);
   }, []);
 
   // Effect ini berjalan untuk mengatur global style awal editor
@@ -163,11 +202,19 @@ export function SidebarLeft() {
               {["#000000", "#52525b", "#ef4444", "#3b82f6", "#10b981"].map((color) => (
                 <button
                   key={color}
-                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    // Simpan rentang kursor (selection) sebelum kehilangan fokus ke tombol
+                    const selection = window.getSelection();
+                    if (!selection || selection.rangeCount === 0) return;
+
+                    const editor = document.getElementById("main-editor");
+                    if (editor && !editor.contains(selection.anchorNode)) {
+                      editor.focus();
+                    }
+                  }}
                   onClick={() => {
                     setFontColor(color);
-                    const editor = document.getElementById("main-editor");
-                    if (editor && document.activeElement !== editor) editor.focus();
                     document.execCommand("foreColor", false, color);
                   }}
                   className={`w-full aspect-square rounded-full border-2 transition-transform duration-200 ${fontColor === color
@@ -186,6 +233,12 @@ export function SidebarLeft() {
               <input
                 type="color"
                 value={fontColor}
+                onMouseDown={(e) => {
+                  const selection = window.getSelection();
+                  if (!selection || selection.rangeCount === 0) return;
+                  const editor = document.getElementById("main-editor");
+                  if (editor && !editor.contains(selection.anchorNode)) editor.focus();
+                }}
                 onChange={(e) => {
                   setFontColor(e.target.value);
                   const editor = document.getElementById("main-editor");
