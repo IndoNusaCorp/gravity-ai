@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { SidebarLeft } from "@/components/SidebarLeft";
 import { SidebarRight } from "@/components/SidebarRight";
 import { Search, Send, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Markdown from "markdown-to-jsx";
 
 export default function Home() {
@@ -14,12 +14,19 @@ export default function Home() {
   const [isChatActive, setIsChatActive] = useState(false);
   // State untuk menyimpan teks yang diketik pengguna di kolom pencarian/input
   const [inputValue, setInputValue] = useState("");
-  // State untuk menyimpan pesan terakhir yang dikirim pengguna ke AI
-  const [userMessage, setUserMessage] = useState("");
-  // State untuk menyimpan balasan dari AI
-  const [aiMessage, setAiMessage] = useState("");
+  // State untuk menyimpan riwayat obrolan (chat history)
+  const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant", content: string }[]>([]);
   // State loading AI
   const [isLoading, setIsLoading] = useState(false);
+
+  // Ref untuk autoscroll chat
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatHistory, isLoading, isChatActive]);
 
   // State untuk menyimpan gambar yang diupload ke atas kertas
   const [uploadedImages, setUploadedImages] = useState<{ id: string; src: string; x: number; y: number }[]>([]);
@@ -41,13 +48,15 @@ export default function Home() {
   const sendToAI = async (messageText: string) => {
     if (!messageText.trim() || isLoading) return;
 
-    setUserMessage(messageText);
+    const newUserMessage = { role: "user" as const, content: messageText };
+    setChatHistory(prev => [...prev, newUserMessage]);
+
     setInputValue("");
-    setAiMessage(""); // Reset balasan sebelumnya
     setIsChatActive(true);
     setIsLoading(true);
 
     try {
+      // Create a prompt from the latest message (Wait until backend supports full history parsing)
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -63,10 +72,11 @@ export default function Home() {
       const data = await response.json();
       // Mengambil balasan dari AI
       const reply = data.reply || data.text || data.response || (typeof data === 'string' ? data : "Pesan berhasil diterima.");
-      setAiMessage(reply);
+
+      setChatHistory(prev => [...prev, { role: "assistant", content: reply }]);
     } catch (error) {
       console.error("Error fetching from API:", error);
-      setAiMessage("Maaf, saya sedang kesulitan terhubung dengan AI saat ini.");
+      setChatHistory(prev => [...prev, { role: "assistant", content: "Maaf, saya sedang kesulitan terhubung dengan AI saat ini." }]);
     } finally {
       setIsLoading(false);
     }
@@ -180,39 +190,42 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10, transition: { duration: 0.2 } }}
                   transition={{ delay: 0.1, duration: 0.4 }}
-                  className="flex flex-col gap-6 w-full max-w-xl mx-auto mb-6 pointer-events-auto max-h-[50vh] overflow-y-auto scrollbar-hide p-4 bg-white/40 dark:bg-zinc-900/60 backdrop-blur-md rounded-3xl border border-white/50 dark:border-zinc-800/50 shadow-xl"
+                  className="flex flex-col gap-4 w-full max-w-xl mx-auto mb-6 pointer-events-auto max-h-[50vh] overflow-y-auto scrollbar-hide p-4 bg-white/40 dark:bg-zinc-900/60 backdrop-blur-md rounded-3xl border border-white/50 dark:border-zinc-800/50 shadow-xl"
+                  ref={chatContainerRef}
                 >
-                  <div className="flex justify-between items-center w-full mb-2 border-b border-zinc-200/50 dark:border-zinc-800/50 pb-2">
-                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest pl-2">LibraAI Assistant</span>
+                  <div className="flex justify-between items-center w-full mb-2 border-b border-zinc-200/50 dark:border-zinc-800/50 pb-2 sticky top-0 bg-white/40 dark:bg-zinc-900/60 backdrop-blur-md z-10 px-2 rounded-t-xl -mt-2 pt-2">
+                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest pl-2">LibraAI</span>
                     <button
-                      onClick={() => {
-                        setIsChatActive(false);
-                      }}
+                      onClick={() => setIsChatActive(false)}
                       className="p-1.5 rounded-full text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-colors"
                       title="Sembunyikan Obrolan"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="flex justify-end">
-                    <div className="bg-zinc-100 dark:bg-zinc-800 px-5 py-3.5 rounded-2xl rounded-tr-sm max-w-[85%] shadow-sm">
-                      <p className="text-zinc-900 dark:text-white font-medium leading-relaxed text-sm whitespace-pre-wrap">{userMessage}</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-start w-full">
-                    <div className="bg-zinc-900 dark:bg-zinc-100 px-5 py-3.5 rounded-2xl rounded-tl-sm w-fit max-w-[95%] shadow-md">
-                      {isLoading ? (
-                        <div className="flex gap-1.5 items-center justify-center h-5 px-2">
-                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+
+                  <div className="flex flex-col gap-6 px-1 pb-2">
+                    {chatHistory.map((msg, idx) => (
+                      <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start w-full'}`}>
+                        <div className={`${msg.role === 'user' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-tr-sm max-w-[85%]' : 'bg-zinc-900 dark:bg-zinc-100 rounded-tl-sm w-fit max-w-[95%] text-white dark:text-zinc-900'} px-5 py-4 rounded-2xl shadow-sm overflow-x-auto`}>
+                          <div className={`font-medium leading-relaxed text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'text-zinc-900 dark:text-white' : ''}`}>
+                            {msg.role === 'user' ? msg.content : <Markdown>{msg.content}</Markdown>}
+                          </div>
                         </div>
-                      ) : (
-                        <div className="text-white dark:text-zinc-900 font-medium leading-relaxed text-sm overflow-x-auto whitespace-pre-wrap">
-                          <Markdown>{aiMessage || ""}</Markdown>
+                      </div>
+                    ))}
+
+                    {isLoading && (
+                      <div className="flex justify-start w-full">
+                        <div className="bg-zinc-900 dark:bg-zinc-100 px-5 py-4 rounded-2xl rounded-tl-sm w-fit shadow-md">
+                          <div className="flex gap-1.5 items-center justify-center h-4 px-2">
+                            <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                            <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                            <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
