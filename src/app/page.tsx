@@ -57,7 +57,7 @@ export default function Home() {
 
     try {
       // Create a prompt from the latest message (Wait until backend supports full history parsing)
-      const response = await fetch("/api/chat", {
+      const response = await fetch("/api/LibraAI", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -76,7 +76,7 @@ export default function Home() {
       setChatHistory(prev => [...prev, { role: "friend", content: reply }]);
     } catch (error) {
       console.error("Error fetching from API:", error);
-      setChatHistory(prev => [...prev, { role: "friend", content: "Maaf, saya sedang kesulitan terhubung dengan AI saat ini." }]);
+      setChatHistory(prev => [...prev, { role: "friend", content: "Maaf, saya sedang kesulitan terhubung dengan LibraAI saat ini." }]);
     } finally {
       setIsLoading(false);
     }
