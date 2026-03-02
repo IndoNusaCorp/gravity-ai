@@ -5,6 +5,7 @@ import { SidebarLeft } from "@/components/SidebarLeft";
 import { SidebarRight } from "@/components/SidebarRight";
 import { Search, Send, X } from "lucide-react";
 import { useState } from "react";
+import Markdown from "markdown-to-jsx";
 
 export default function Home() {
   // State untuk melacak apakah input sedang fokus (diklik)
@@ -14,7 +15,11 @@ export default function Home() {
   // State untuk menyimpan teks yang diketik pengguna di kolom pencarian/input
   const [inputValue, setInputValue] = useState("");
   // State untuk menyimpan pesan terakhir yang dikirim pengguna ke AI
-  const [chatMessage, setChatMessage] = useState("");
+  const [userMessage, setUserMessage] = useState("");
+  // State untuk menyimpan balasan dari AI
+  const [aiMessage, setAiMessage] = useState("");
+  // State loading AI
+  const [isLoading, setIsLoading] = useState(false);
 
   // State untuk menyimpan gambar yang diupload ke atas kertas
   const [uploadedImages, setUploadedImages] = useState<{ id: string; src: string; x: number; y: number }[]>([]);
@@ -32,25 +37,58 @@ export default function Home() {
     ]);
   };
 
-  // Fungsi yang dipanggil saat pengguna mengirim pesan ke AI
+  // Fungsi utama untuk mengirim pesan ke AI
+  const sendToAI = async (messageText: string) => {
+    if (!messageText.trim() || isLoading) return;
+
+    setUserMessage(messageText);
+    setInputValue("");
+    setAiMessage(""); // Reset balasan sebelumnya
+    setIsChatActive(true);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prompt: messageText }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch from API");
+      }
+
+      const data = await response.json();
+      // Mengambil balasan dari AI
+      const reply = data.reply || data.text || data.response || (typeof data === 'string' ? data : "Pesan berhasil diterima.");
+      setAiMessage(reply);
+    } catch (error) {
+      console.error("Error fetching from API:", error);
+      setAiMessage("Maaf, saya sedang kesulitan terhubung dengan AI saat ini.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSend = () => sendToAI(inputValue);
+
   const handleStart = () => {
-    // Memastikan input tidak kosong
     if (inputValue.trim()) {
-      setChatMessage(inputValue); // Menyimpan pesan untuk ditampilkan di chat
-      setIsChatActive(true); // Menampilkan kotak obrolan AI
+      handleSend();
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      handleStart();
+      e.preventDefault();
+      handleSend();
     }
   };
 
   const handleSuggestion = (suggestion: string) => {
-    setInputValue(suggestion);
-    setChatMessage(suggestion);
-    setIsChatActive(true);
+    sendToAI(suggestion);
   };
 
   return (
@@ -158,14 +196,22 @@ export default function Home() {
                   </div>
                   <div className="flex justify-end">
                     <div className="bg-zinc-100 dark:bg-zinc-800 px-5 py-3.5 rounded-2xl rounded-tr-sm max-w-[85%] shadow-sm">
-                      <p className="text-zinc-900 dark:text-white font-medium leading-relaxed text-sm">{chatMessage}</p>
+                      <p className="text-zinc-900 dark:text-white font-medium leading-relaxed text-sm whitespace-pre-wrap">{userMessage}</p>
                     </div>
                   </div>
-                  <div className="flex justify-start">
-                    <div className="bg-zinc-900 dark:bg-zinc-100 px-5 py-3.5 rounded-2xl rounded-tl-sm max-w-[85%] shadow-md">
-                      <p className="text-white dark:text-zinc-900 font-medium leading-relaxed text-sm">
-                        Bagus sekali! Mari kita explore lebih dalam tentang <strong>{chatMessage}</strong>. Saya bisa membantu Anda menyusun kerangka untuk tulisan di kertas ini.
-                      </p>
+                  <div className="flex justify-start w-full">
+                    <div className="bg-zinc-900 dark:bg-zinc-100 px-5 py-3.5 rounded-2xl rounded-tl-sm w-fit max-w-[95%] shadow-md">
+                      {isLoading ? (
+                        <div className="flex gap-1.5 items-center justify-center h-5 px-2">
+                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                        </div>
+                      ) : (
+                        <div className="text-white dark:text-zinc-900 font-medium leading-relaxed text-sm overflow-x-auto whitespace-pre-wrap">
+                          <Markdown>{aiMessage || ""}</Markdown>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -195,7 +241,6 @@ export default function Home() {
                   onBlur={() => setIsFocused(false)} // Mengubah state saat input ditinggalkan
                   className="w-full bg-transparent border-none outline-none py-3 pr-4 text-zinc-900 dark:text-white placeholder:text-zinc-400 text-sm font-medium"
                 />
-
                 <button
                   onClick={handleStart}
                   className="hidden sm:flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 w-12 h-12 rounded-xl font-medium transition-all shadow-sm active:scale-95 group-hover:shadow-md border border-transparent dark:border-zinc-200">
