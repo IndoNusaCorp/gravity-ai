@@ -249,7 +249,7 @@ export default function Home() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown} // Menjalankan fungsi saat tombol (seperti Enter) ditekan
-                  placeholder="Tanya LibraAI atau minta bantuan menulis..."
+                  placeholder="Tanya LibraAI tentang Research, Skripsi, atau Artikel Ilmiah"
                   onFocus={() => setIsFocused(true)} // Mengubah state fokus saat input diklik
                   onBlur={() => setIsFocused(false)} // Mengubah state saat input ditinggalkan
                   className="w-full bg-transparent border-none outline-none py-3 pr-4 text-zinc-900 dark:text-white placeholder:text-zinc-400 text-sm font-medium"

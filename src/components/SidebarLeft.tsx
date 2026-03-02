@@ -301,33 +301,6 @@ export function SidebarLeft() {
             ))}
           </div>
         </div>
-
-        {/* Theme Toggle */}
-        <div className="space-y-3 pt-6 border-t border-zinc-200 dark:border-zinc-800">
-          <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Appearance</label>
-          <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800/50 rounded-lg">
-            <button
-              onClick={() => setTheme("light")}
-              className={`flex-1 py-1.5 rounded-md flex justify-center items-center gap-2 transition-all ${mounted && theme === "light"
-                ? "bg-white text-zinc-900 shadow-sm"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-700/50"
-                }`}
-            >
-              <Sun className="w-4 h-4" />
-              <span className="text-xs font-medium">Light</span>
-            </button>
-            <button
-              onClick={() => setTheme("dark")}
-              className={`flex-1 py-1.5 rounded-md flex justify-center items-center gap-2 transition-all ${mounted && theme === "dark"
-                ? "bg-zinc-700 text-white shadow-sm dark:bg-zinc-700"
-                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-white/50 dark:hover:bg-zinc-700/50"
-                }`}
-            >
-              <Moon className="w-4 h-4" />
-              <span className="text-xs font-medium">Dark</span>
-            </button>
-          </div>
-        </div>
       </div>
     </motion.div>
   );
