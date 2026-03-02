@@ -15,7 +15,7 @@ export default function Home() {
   // State untuk menyimpan teks yang diketik pengguna di kolom pencarian/input
   const [inputValue, setInputValue] = useState("");
   // State untuk menyimpan riwayat obrolan (chat history)
-  const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant", content: string }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ role: "user" | "friend", content: string }[]>([]);
   // State loading AI
   const [isLoading, setIsLoading] = useState(false);
 
@@ -71,12 +71,12 @@ export default function Home() {
 
       const data = await response.json();
       // Mengambil balasan dari AI
-      const reply = data.reply || data.text || data.response || (typeof data === 'string' ? data : "Pesan berhasil diterima.");
+      const reply = data.data?.message || data.reply || data.text || data.response || (typeof data === 'string' ? data : "Pesan berhasil diterima.");
 
-      setChatHistory(prev => [...prev, { role: "assistant", content: reply }]);
+      setChatHistory(prev => [...prev, { role: "friend", content: reply }]);
     } catch (error) {
       console.error("Error fetching from API:", error);
-      setChatHistory(prev => [...prev, { role: "assistant", content: "Maaf, saya sedang kesulitan terhubung dengan AI saat ini." }]);
+      setChatHistory(prev => [...prev, { role: "friend", content: "Maaf, saya sedang kesulitan terhubung dengan AI saat ini." }]);
     } finally {
       setIsLoading(false);
     }

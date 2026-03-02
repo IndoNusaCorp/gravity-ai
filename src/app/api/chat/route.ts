@@ -1,21 +1,17 @@
-import { LibraAI } from 'libra-ai-sdk';
+import { LibraAI, LibraChatOptions, LibraResponse } from 'libra-ai-sdk';
 import { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-
-const libraapikey = process.env.LIBRAAI_API_KEY || process.env.LIBRA_API_KEY;
-
-
 
 export async function POST(req: NextRequest) {
     try {
         const { prompt } = await req.json();
 
-        if (!libraapikey) {
+        if (!process.env.LIBRAAI_API_KEY) {
             console.error("API Key for LibraAI is missing. Please check your .env file.");
             return NextResponse.json({ error: "LIBRAAI_API_KEY is missing" }, { status: 500 });
         }
 
-        const libra = new LibraAI(libraapikey);
+        const libra = new LibraAI(process.env.LIBRAAI_API_KEY, 'https://www.libraai.site/');
 
         //disini custominstruction
         const customInstruction = `
@@ -25,10 +21,13 @@ export async function POST(req: NextRequest) {
         Kamu merespon dengan sopan.
         Kamu merespon to the point tanpa basa basi.
         Kamu profesional.
+        Respon pakai bahasa profesional.
         `;
 
         const response = await libra.chat(prompt, {
-            systemPrompt: customInstruction
+            systemPrompt: customInstruction,
+            temperature: 0.7,
+            maxTokens: 2048
         });
 
         return NextResponse.json(response);
