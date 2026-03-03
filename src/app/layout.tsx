@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gravity AI (Under Development)",
-  description: "Gravity AI (Under Development)",
+  title: "Gravity AI",
+  description: "Gravity AI untuk membantu pembuatan research, skripsi, dan artikel ilmiah.",
 };
 
 export default function RootLayout({
