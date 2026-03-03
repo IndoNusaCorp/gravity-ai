@@ -126,7 +126,7 @@ export function AuthModal({ isOpen, onClose, initialType }: AuthModalProps) {
                                     }`}
                             >
                                 {type === "login" ? (
-                                    <Sparkles className="w-7 h-7 text-white" />
+                                    <img src="/GravityAI.png" alt="GravityAI Logo" className="w-7 h-7 object-contain" />
                                 ) : (
                                     <Rocket className="w-7 h-7 text-white/90 ml-0.5 mb-0.5" />
                                 )}
