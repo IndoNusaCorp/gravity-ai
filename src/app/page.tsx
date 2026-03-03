@@ -220,90 +220,90 @@ export default function Home() {
             </motion.div>
           ))}
         </div>
+      </main>
 
-        {/* Overlay Content Area (Chat & Search) */}
-        <div className="fixed bottom-0 left-0 right-0 z-20 flex flex-col pointer-events-none p-6 sm:p-12 justify-end">
-          {/* Chat Messages */}
-          <AnimatePresence>
-            {isChatActive && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10, transition: { duration: 0.2 } }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-                className="flex flex-col gap-4 w-full max-w-xl mx-auto mb-6 pointer-events-auto max-h-[50vh] overflow-y-auto scrollbar-hide p-4 bg-white/40 dark:bg-zinc-900/60 backdrop-blur-md rounded-3xl border border-white/50 dark:border-zinc-800/50 shadow-xl"
-                ref={chatContainerRef}
-              >
-                <div className="flex justify-between items-center w-full mb-2 border-b border-zinc-200/50 dark:border-zinc-800/50 pb-2 sticky top-0 bg-white/40 dark:bg-zinc-900/60 backdrop-blur-md z-10 px-2 rounded-t-xl -mt-2 pt-2">
-                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest pl-2">LibraAI</span>
-                  <button
-                    onClick={() => setIsChatActive(false)}
-                    className="p-1.5 rounded-full text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-colors"
-                    title="Sembunyikan Obrolan"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-6 px-1 pb-2">
-                  {chatHistory.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start w-full'}`}>
-                      <div className={`${msg.role === 'user' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-tr-sm max-w-[85%]' : 'bg-zinc-900 dark:bg-zinc-100 rounded-tl-sm w-fit max-w-[95%] text-white dark:text-zinc-900'} px-5 py-4 rounded-2xl shadow-sm overflow-x-auto`}>
-                        <div className={`font-medium leading-relaxed text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'text-zinc-900 dark:text-white' : ''}`}>
-                          {msg.role === 'user' ? msg.content : <Markdown>{msg.content}</Markdown>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {isLoading && (
-                    <div className="flex justify-start w-full">
-                      <div className="bg-zinc-900 dark:bg-zinc-100 px-5 py-4 rounded-2xl rounded-tl-sm w-fit shadow-md">
-                        <div className="flex gap-1.5 items-center justify-center h-4 px-2">
-                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Search Input Container */}
-          <motion.div
-            layout
-            className={`w-full max-w-xl mx-auto relative z-50 group shrink-0 pointer-events-auto transition-all duration-700 ease-[0.16,1,0.3,1] ${!isChatActive ? "translate-y-[12vh]" : ""}`}
-          >
-            <div className={`absolute inset-0 bg-zinc-900/5 dark:bg-white/5 rounded-2xl blur-xl transition-all duration-300 ${isFocused ? "opacity-100 scale-105" : "opacity-0 scale-100"}`} />
-
-            <div className={`relative flex items-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-2 rounded-2xl p-2 transition-colors duration-300 shadow-xl shadow-zinc-200/20 dark:shadow-black/40 ${isFocused ? "border-zinc-900 dark:border-white" : "border-zinc-200/80 dark:border-zinc-800/80"}`}>
-              <div className="pl-4 pr-3">
-                <Search className={`w-5 h-5 transition-colors duration-300 ${isFocused ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`} />
+      {/* Floating Chat & Search Overlay — ngambang di atas semua konten */}
+      <div className="fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center pointer-events-none px-4 sm:px-12">
+        {/* Chat Messages */}
+        <AnimatePresence>
+          {isChatActive && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10, transition: { duration: 0.2 } }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+              className="flex flex-col gap-4 w-full max-w-xl mb-4 pointer-events-auto max-h-[50vh] overflow-y-auto scrollbar-hide p-4 bg-white/70 dark:bg-zinc-900/80 backdrop-blur-xl rounded-3xl border border-white/60 dark:border-zinc-700/60 shadow-2xl"
+              ref={chatContainerRef}
+            >
+              <div className="flex justify-between items-center w-full mb-2 border-b border-zinc-200/50 dark:border-zinc-800/50 pb-2 sticky top-0 bg-white/70 dark:bg-zinc-900/80 backdrop-blur-xl z-10 px-2 rounded-t-xl -mt-2 pt-2">
+                <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest pl-2">LibraAI</span>
+                <button
+                  onClick={() => setIsChatActive(false)}
+                  className="p-1.5 rounded-full text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                  title="Sembunyikan Obrolan"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Input Teks untuk ngobrol dengan AI */}
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown} // Menjalankan fungsi saat tombol (seperti Enter) ditekan
-                placeholder="Tanya LibraAI tentang Research, Skripsi, atau Artikel Ilmiah"
-                onFocus={() => setIsFocused(true)} // Mengubah state fokus saat input diklik
-                onBlur={() => setIsFocused(false)} // Mengubah state saat input ditinggalkan
-                className="w-full bg-transparent border-none outline-none py-3 pr-4 text-zinc-900 dark:text-white placeholder:text-zinc-400 text-sm font-medium"
-              />
-              <button
-                onClick={handleStart}
-                className="hidden sm:flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 w-12 h-12 rounded-xl font-medium transition-all shadow-sm active:scale-95 group-hover:shadow-md border border-transparent dark:border-zinc-200">
-                <Send className="w-5 h-5 ml-1" />
-              </button>
+              <div className="flex flex-col gap-6 px-1 pb-2">
+                {chatHistory.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start w-full'}`}>
+                    <div className={`${msg.role === 'user' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-tr-sm max-w-[85%]' : 'bg-zinc-900 dark:bg-zinc-100 rounded-tl-sm w-fit max-w-[95%] text-white dark:text-zinc-900'} px-5 py-4 rounded-2xl shadow-sm overflow-x-auto`}>
+                      <div className={`font-medium leading-relaxed text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'text-zinc-900 dark:text-white' : ''}`}>
+                        {msg.role === 'user' ? msg.content : <Markdown>{msg.content}</Markdown>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {isLoading && (
+                  <div className="flex justify-start w-full">
+                    <div className="bg-zinc-900 dark:bg-zinc-100 px-5 py-4 rounded-2xl rounded-tl-sm w-fit shadow-md">
+                      <div className="flex gap-1.5 items-center justify-center h-4 px-2">
+                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                        <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Search Input — selalu terlihat di bawah layar */}
+        <motion.div
+          layout
+          className="w-full max-w-xl relative group shrink-0 pointer-events-auto"
+        >
+          <div className={`absolute inset-0 bg-zinc-900/5 dark:bg-white/5 rounded-2xl blur-xl transition-all duration-300 ${isFocused ? "opacity-100 scale-105" : "opacity-0 scale-100"}`} />
+
+          <div className={`relative flex items-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border-2 rounded-2xl p-2 transition-colors duration-300 shadow-2xl shadow-zinc-300/30 dark:shadow-black/50 ${isFocused ? "border-zinc-900 dark:border-white" : "border-zinc-200/80 dark:border-zinc-800/80"}`}>
+            <div className="pl-4 pr-3">
+              <Search className={`w-5 h-5 transition-colors duration-300 ${isFocused ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`} />
             </div>
-          </motion.div>
-        </div>
-      </main>
+
+            {/* Input Teks untuk ngobrol dengan AI */}
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Tanya LibraAI tentang Research, Skripsi, atau Artikel Ilmiah"
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              className="w-full bg-transparent border-none outline-none py-3 pr-4 text-zinc-900 dark:text-white placeholder:text-zinc-400 text-sm font-medium"
+            />
+            <button
+              onClick={handleStart}
+              className="hidden sm:flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 w-12 h-12 rounded-xl font-medium transition-all shadow-sm active:scale-95 group-hover:shadow-md border border-transparent dark:border-zinc-200">
+              <Send className="w-5 h-5 ml-1" />
+            </button>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }
