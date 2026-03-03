@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, User, ArrowRight, Loader2, X, Sparkles, Rocket } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type AuthType = "login" | "register";
 
@@ -38,23 +43,25 @@ export function AuthModal({ isOpen, onClose, initialType }: AuthModalProps) {
 
         try {
             if (type === "login") {
-                const res = await fetch("/Authentication", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email, password }),
+                const { error: signInError } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
                 });
-                const data = await res.json();
-                if (!res.ok || data.error) {
-                    throw new Error(data.error || "Failed to login. Please check your credentials.");
+
+                if (signInError) {
+                    throw new Error(signInError.message || "Failed to login. Please check your credentials.");
                 }
             } else {
-                const params = new URLSearchParams({ username, email, password });
-                const res = await fetch(`/Authentication?${params.toString()}`, {
-                    method: "GET",
+                const { error: signUpError } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: { username }
+                    }
                 });
-                const data = await res.json();
-                if (!res.ok || data.error) {
-                    throw new Error(data.error || "Failed to register. Please try again.");
+
+                if (signUpError) {
+                    throw new Error(signUpError.message || "Failed to register. Please try again.");
                 }
             }
 
