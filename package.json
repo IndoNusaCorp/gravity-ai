@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
     "framer-motion": "^12.34.3",
     "libra-ai-sdk": "^2.0.1",
     "lucide-react": "^0.575.0",
