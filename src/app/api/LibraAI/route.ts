@@ -18,9 +18,6 @@ function generateArtikelPrompt(topic: string) {
     return `Buatkan draf artikel ilmiah tentang topik: "${topic}". Gunakan format standar publikasi akademik: Abstrak, Pendahuluan, Tinjauan Literatur, Pemaparan/Diskusi, dan Kesimpulan.`;
 }
 
-
-
-
 export async function POST(req: NextRequest) {
     try {
         // Tambahkan parameter 'type' atau 'action' dari frontend jika ada
