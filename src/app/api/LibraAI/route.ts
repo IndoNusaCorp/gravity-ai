@@ -21,7 +21,7 @@ function generateArtikelPrompt(topic: string) {
 export async function POST(req: NextRequest) {
     try {
         // Tambahkan parameter 'type' atau 'action' dari frontend jika ada
-        const { prompt, type } = await req.json();
+        const { prompt, type, history } = await req.json();
 
         if (!process.env.LIBRAAI_API_KEY) {
             console.error("API Key for LibraAI is missing. Please check your .env file.");
@@ -38,6 +38,16 @@ export async function POST(req: NextRequest) {
             finalPrompt = generateSkripsiPrompt(prompt);
         } else if (type === 'artikel') {
             finalPrompt = generateArtikelPrompt(prompt);
+        }
+
+        // Susun riwayat obrolan (chat history) agar AI mengingat konteks percakapan
+        let historyContext = "";
+        if (history && Array.isArray(history) && history.length > 0) {
+            historyContext = `
+        === RIWAYAT PERCAKAPAN SEBELUMNYA ===
+        ${history.map((msg: any) => `${msg.role === 'user' ? 'User' : 'Kamu (LibraAI)'}: ${msg.content}`).join('\n        ')}
+        =====================================
+            `;
         }
 
         // Panggil fungsi Brain untuk mendapatkan konteks tambahan
@@ -74,14 +84,20 @@ export async function POST(req: NextRequest) {
         Kamu merespon dengan sopan, profesional, dan to the point tanpa basa basi.
         Berikan format teks yang rapi dan mudah dibaca (menggunakan markdown seperti bold, list, atau heading jika perlu).
         Kamu memberi link sumber dari internet yang terpercaya dan relevan dengan topik yang dibahas.
+        Kamu menanyakan untuk memastikan apakah user ingin melanjutkan atau tidak.
+        Kamu menanyakan untuk di buatkan research, skripsi, atau artikel ilmiah lagi atau tidak.
+        Selalu ingat percakapan sebelumnya dan pastikan percakapan tetap relevan dan nyambung dengan konteks yang diberikan pada ===== RIWAYAT PERCAKAPAN SEBELUMNYA =====.
+        ${historyContext}
         ${brainContext}
         `;
 
         const response = await libra.chat(finalPrompt, {
             systemPrompt: customInstruction,
             temperature: 0.7,
-            maxTokens: 2048
-        });
+            maxTokens: 2048,
+            keeptalking: true,
+            rememberPreviousConversation: true
+        } as LibraChatOptions & { keeptalking?: boolean, rememberPreviousConversation?: boolean });
 
         return NextResponse.json(response);
     } catch (error) {

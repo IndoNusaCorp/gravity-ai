@@ -67,13 +67,20 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      // Create a prompt from the latest message (Wait until backend supports full history parsing)
+      // Extract recent history to send to backend for context memory
+      // We send up to the last 6 messages (excluding the one we just added)
+      const recentHistory = chatHistory.slice(-6).map(msg => ({
+        role: msg.role === "user" ? "user" : "assistant",
+        content: msg.content
+      }));
+
+      // Create a prompt from the latest message and attach history context
       const response = await fetch("/api/LibraAI", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt: messageText }),
+        body: JSON.stringify({ prompt: messageText, history: recentHistory }),
       });
 
       if (!response.ok) {

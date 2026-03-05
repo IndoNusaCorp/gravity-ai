@@ -1,6 +1,8 @@
 // disini brain menggunakan KNN (K-Nearest Neighbors)
 // API DUCKDUCK GO untuk browser kebutuhan research, skripsi, artikel ilmiah
 
+import LibraAI from "libra-ai-sdk";
+
 export type DataPoint = {
     keywords: string[];
     label: string;
@@ -29,6 +31,8 @@ const TrainingData: DataPoint[] = [
     { keywords: ['berita', 'hari', 'ini', 'cuaca', 'film', 'lagu', 'musik', 'rekomendasi', 'makan', 'resep', 'cara', 'membuat', 'game'], label: 'umum' },
 ];
 
+
+
 /**
  * Fungsi untuk menghitung jarak kemiripan teks menggunakan jaccard similarity
  * (Kita modifikasi dari euclidean distance agar cocok untuk data teks).
@@ -45,7 +49,11 @@ function calculateTextDistance(queryWords: string[], trainingWords: string[]): n
  * Mengambil data referensi dari DuckDuckGo
  */
 export async function fetchDuckDuckGo(query: string) {
-    const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`);
+    const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+        }
+    });
     if (!response.ok) {
         throw new Error('Gagal mengambil data dari DuckDuckGo API');
     }
@@ -103,3 +111,4 @@ export async function Brain(
         duckDuckGoResult: searchResult
     };
 }
+
