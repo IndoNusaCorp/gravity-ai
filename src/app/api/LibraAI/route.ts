@@ -25,56 +25,105 @@ function generatePaperPrompt(topic: string, docType: string) {
 Gunakan format penulisan akademis yang baku dan terstruktur:
 
 1. **Judul Penelitian**
-2. **Abstrak** (ringkasan singkat 150-250 kata)
-3. **Kata Kunci** (5-7 kata kunci)
-4. **BAB I - Pendahuluan** (Latar Belakang, Rumusan Masalah, Tujuan Penelitian, Manfaat Penelitian)
-5. **BAB II - Tinjauan Pustaka** (Landasan Teori, Penelitian Terdahulu)
-6. **BAB III - Metode Penelitian** (Pendekatan, Teknik Pengumpulan Data, Analisis Data)
-7. **BAB IV - Hasil dan Pembahasan**
-8. **BAB V - Kesimpulan dan Saran**
-9. **Daftar Pustaka** (format APA)
+Gunakan format markdown yang terstruktur sebagai berikut:
 
-Tulis dengan bahasa baku, formal, dan akademis. Berikan penjelasan yang mendalam pada setiap bagian. Gunakan heading/sub-heading dengan format markdown yang jelas.`,
+# Judul Penelitian
+## Abstrak
+(ringkasan singkat 150-250 kata)
+
+## Kata Kunci
+(5-7 kata kunci yang relevan)
+
+## BAB I - Pendahuluan
+### 1.1 Latar Belakang
+### 1.2 Rumusan Masalah
+### 1.3 Tujuan Penelitian
+### 1.4 Manfaat Penelitian
+
+## BAB II - Tinjauan Pustaka
+### 2.1 Landasan Teori
+### 2.2 Penelitian Terdahulu
+
+## BAB III - Metode Penelitian
+### 3.1 Pendekatan Penelitian
+### 3.2 Teknik Pengumpulan Data
+### 3.3 Analisis Data
+
+## BAB IV - Hasil dan Pembahasan
+
+## BAB V - Kesimpulan dan Saran
+
+## Daftar Pustaka
+(format APA)
+
+PENTING: Gunakan heading markdown (#, ##, ###) untuk setiap judul dan sub-judul. Tulis paragraf dengan lengkap dan mendalam. Gunakan bullet list (-) untuk daftar item. Tulis dengan bahasa baku, formal, dan akademis.`,
 
         skripsi: `Buatkan draf skripsi lengkap tentang topik: "${topic}".
-Gunakan format penulisan skripsi yang baku:
+Gunakan format markdown yang terstruktur sebagai berikut:
 
-1. **Halaman Judul**
-2. **Abstrak** (Bahasa Indonesia, 200-300 kata)
-3. **BAB I - PENDAHULUAN**
-   - 1.1 Latar Belakang Masalah
-   - 1.2 Identifikasi Masalah
-   - 1.3 Rumusan Masalah
-   - 1.4 Tujuan Penelitian
-   - 1.5 Manfaat Penelitian
-4. **BAB II - TINJAUAN PUSTAKA**
-   - 2.1 Landasan Teori
-   - 2.2 Kerangka Berpikir
-   - 2.3 Hipotesis (jika ada)
-5. **BAB III - METODOLOGI PENELITIAN**
-   - 3.1 Waktu dan Tempat Penelitian
-   - 3.2 Metode Penelitian
-   - 3.3 Populasi dan Sampel
-   - 3.4 Instrumen Penelitian
-   - 3.5 Teknik Analisis Data
-6. **Daftar Pustaka** (format APA)
+# Skripsi: [Judul tentang ${topic}]
 
-Tulis secara lengkap, mendalam, formal, dan akademis. Gunakan heading/sub-heading dengan format markdown.`,
+## Abstrak
+(Bahasa Indonesia, 200-300 kata)
+
+## BAB I - PENDAHULUAN
+### 1.1 Latar Belakang Masalah
+### 1.2 Identifikasi Masalah
+### 1.3 Rumusan Masalah
+### 1.4 Tujuan Penelitian
+### 1.5 Manfaat Penelitian
+
+## BAB II - TINJAUAN PUSTAKA
+### 2.1 Landasan Teori
+### 2.2 Kerangka Berpikir
+### 2.3 Hipotesis
+
+## BAB III - METODOLOGI PENELITIAN
+### 3.1 Waktu dan Tempat Penelitian
+### 3.2 Metode Penelitian
+### 3.3 Populasi dan Sampel
+### 3.4 Instrumen Penelitian
+### 3.5 Teknik Analisis Data
+
+## Daftar Pustaka
+(format APA)
+
+PENTING: Gunakan heading markdown (#, ##, ###) untuk setiap judul dan sub-judul. Tulis setiap bagian dengan lengkap, mendalam, formal, dan akademis. Gunakan paragraf yang panjang dan mendetail. Gunakan bullet list (-) untuk daftar item.`,
 
         artikel: `Buatkan draf artikel ilmiah (journal paper) lengkap tentang topik: "${topic}".
-Gunakan format standar publikasi jurnal ilmiah:
+Gunakan format markdown yang terstruktur sebagai berikut:
 
-1. **Judul Artikel** (singkat, jelas, informatif)
-2. **Abstrak** (150-250 kata, mencakup tujuan, metode, hasil, kesimpulan)
-3. **Keywords** (5-7 kata kunci)
-4. **1. Pendahuluan** (latar belakang, gap penelitian, tujuan)
-5. **2. Tinjauan Literatur** (kajian teori & penelitian terdahulu)
-6. **3. Metodologi** (desain penelitian, data, teknik analisis)
-7. **4. Hasil dan Pembahasan** (temuan, analisis, interpretasi)
-8. **5. Kesimpulan** (ringkasan, implikasi, saran)
-9. **Daftar Pustaka** (format APA atau IEEE)
+# [Judul Artikel yang Singkat, Jelas, dan Informatif]
 
-Tulis dengan gaya penulisan akademis yang ketat, menggunakan bahasa formal dan ilmiah. Gunakan heading/sub-heading dengan format markdown.`
+## Abstrak
+(150-250 kata, mencakup tujuan, metode, hasil, kesimpulan)
+
+## Keywords
+(5-7 kata kunci)
+
+## 1. Pendahuluan
+(latar belakang, gap penelitian, tujuan)
+
+## 2. Tinjauan Literatur
+### 2.1 Kajian Teori
+### 2.2 Penelitian Terdahulu
+
+## 3. Metodologi
+### 3.1 Desain Penelitian
+### 3.2 Data dan Sumber Data
+### 3.3 Teknik Analisis
+
+## 4. Hasil dan Pembahasan
+### 4.1 Temuan Penelitian
+### 4.2 Analisis dan Interpretasi
+
+## 5. Kesimpulan
+(ringkasan, implikasi, saran untuk penelitian selanjutnya)
+
+## Daftar Pustaka
+(format APA atau IEEE)
+
+PENTING: Gunakan heading markdown (#, ##, ###) untuk setiap judul dan sub-judul. Tulis dengan gaya penulisan akademis yang ketat. Gunakan bahasa formal dan ilmiah. Tulis paragraf yang lengkap dan mendalam. Gunakan bullet list (-) untuk daftar item.`
     };
     return templates[docType] || templates.research;
 }

@@ -31,13 +31,39 @@ export default function Home() {
 
   // State untuk melacak jumlah halaman paper
   const [pageNumber, setPageNumber] = useState(1);
+  // State untuk halaman yang sedang dipilih (untuk delete)
+  const [selectedPage, setSelectedPage] = useState(0);
 
   const handleAddPaper = () => {
     setPageNumber((prev) => prev + 1);
   };
 
   const handleDeletePaper = () => {
+    if (pageNumber <= 1) return;
+
+    const deleteIdx = selectedPage;
+
+    // Geser konten dari halaman setelah yang dihapus ke halaman sebelumnya
+    for (let i = deleteIdx; i < pageNumber - 1; i++) {
+      const currentEditor = document.getElementById(`main-editor-${i}`);
+      const nextEditor = document.getElementById(`main-editor-${i + 1}`);
+      if (currentEditor && nextEditor) {
+        currentEditor.innerHTML = nextEditor.innerHTML;
+      }
+    }
+
+    // Hapus konten halaman terakhir (karena sudah digeser)
+    const lastEditor = document.getElementById(`main-editor-${pageNumber - 1}`);
+    if (lastEditor) {
+      lastEditor.innerHTML = '';
+    }
+
     setPageNumber((prev) => Math.max(1, prev - 1));
+
+    // Reset selectedPage jika perlu
+    if (selectedPage >= pageNumber - 1) {
+      setSelectedPage(Math.max(0, pageNumber - 2));
+    }
   };
 
   // Ref untuk autoscroll chat
@@ -48,6 +74,125 @@ export default function Home() {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [chatHistory, isLoading, isChatActive]);
+
+  // Ref untuk pageNumber (agar bisa diakses di event handler tanpa stale closure)
+  const pageNumberRef = useRef(pageNumber);
+  useEffect(() => {
+    pageNumberRef.current = pageNumber;
+  }, [pageNumber]);
+
+  // Overflow detection: auto-add page ketika konten melebihi tinggi paper
+  const overflowCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const checkOverflow = useCallback((editorIndex: number) => {
+    const editor = document.getElementById(`main-editor-${editorIndex}`);
+    if (!editor) return;
+
+    // Cek apakah konten melebihi tinggi container
+    if (editor.scrollHeight > editor.clientHeight + 5) { // +5px toleransi
+      // Kumpulkan child nodes yang overflow
+      const children = Array.from(editor.childNodes);
+      if (children.length <= 1) return; // minimal harus punya >1 child
+
+      // Temukan child node pertama yang posisinya melampaui batas bawah editor
+      const editorRect = editor.getBoundingClientRect();
+      const overflowNodes: Node[] = [];
+      let foundOverflow = false;
+
+      for (let i = children.length - 1; i >= 1; i--) {
+        const child = children[i];
+        if (child instanceof HTMLElement) {
+          const childRect = child.getBoundingClientRect();
+          if (childRect.bottom > editorRect.bottom || childRect.top >= editorRect.bottom) {
+            overflowNodes.unshift(child);
+            foundOverflow = true;
+          } else {
+            break; // Sudah di area visible, stop
+          }
+        } else if (foundOverflow || (children[i - 1] instanceof HTMLElement)) {
+          // Untuk text nodes di akhir, pindahkan juga jika sudah ada overflow
+          if (foundOverflow) {
+            overflowNodes.unshift(child);
+          }
+        }
+      }
+
+      if (overflowNodes.length === 0) return;
+
+      // Ekstrak HTML dari overflow nodes
+      const overflowHtml = overflowNodes.map(node => {
+        if (node instanceof HTMLElement) return node.outerHTML;
+        return node.textContent || '';
+      }).join('');
+
+      // Hapus overflow nodes dari editor saat ini
+      overflowNodes.forEach(node => {
+        if (node.parentNode === editor) {
+          editor.removeChild(node);
+        }
+      });
+
+      // Cek apakah halaman berikutnya sudah ada
+      const nextPageIndex = editorIndex + 1;
+      const nextEditor = document.getElementById(`main-editor-${nextPageIndex}`);
+
+      if (nextEditor) {
+        // Halaman berikutnya sudah ada, prepend konten
+        nextEditor.innerHTML = overflowHtml + nextEditor.innerHTML;
+        // Cek overflow cascading di halaman berikutnya
+        setTimeout(() => checkOverflow(nextPageIndex), 200);
+      } else {
+        // Buat halaman baru
+        setPageNumber(prev => prev + 1);
+        // Tunggu DOM render, lalu insert konten
+        setTimeout(() => {
+          const newEditor = document.getElementById(`main-editor-${nextPageIndex}`);
+          if (newEditor) {
+            newEditor.innerHTML = overflowHtml;
+            // Cek overflow cascading
+            setTimeout(() => checkOverflow(nextPageIndex), 200);
+          }
+        }, 300);
+      }
+    }
+  }, []);
+
+  // Effect: pasang event listener di setiap editor untuk deteksi overflow
+  useEffect(() => {
+    const handlers: { editor: HTMLElement; handler: () => void }[] = [];
+
+    for (let i = 0; i < pageNumber; i++) {
+      const editor = document.getElementById(`main-editor-${i}`);
+      if (!editor) continue;
+
+      const handler = () => {
+        // Debounce: tunggu sebentar sebelum cek overflow
+        if (overflowCheckTimerRef.current) {
+          clearTimeout(overflowCheckTimerRef.current);
+        }
+        overflowCheckTimerRef.current = setTimeout(() => {
+          checkOverflow(i);
+        }, 300);
+      };
+
+      editor.addEventListener('input', handler);
+
+      // MutationObserver untuk menangkap perubahan programatik (dari insertToPaper)
+      const observer = new MutationObserver(handler);
+      observer.observe(editor, { childList: true, subtree: true, characterData: true });
+
+      handlers.push({ editor, handler });
+
+      // Juga cek overflow saat pertama kali mount (untuk konten yang sudah ada)
+      setTimeout(() => checkOverflow(i), 500);
+    }
+
+    return () => {
+      handlers.forEach(({ editor, handler }) => {
+        editor.removeEventListener('input', handler);
+      });
+    };
+  }, [pageNumber, checkOverflow]);
 
   // State untuk menyimpan gambar yang diupload ke atas kertas
   const [uploadedImages, setUploadedImages] = useState<{ id: string; src: string; x: number; y: number }[]>([]);
@@ -65,52 +210,240 @@ export default function Home() {
     ]);
   };
 
-  // Helper: Konversi Markdown sederhana ke HTML untuk disisipkan ke paper
+  // Helper: Konversi Markdown ke HTML terstruktur dan rapi untuk paper akademis
   const convertMarkdownToHtml = useCallback((md: string): string => {
-    let html = md;
-    // Escape HTML entities first
-    // (skip this since contentEditable can handle basic tags)
+    const lines = md.split('\n');
+    const htmlParts: string[] = [];
+    let inUl = false;
+    let inOl = false;
+    let paragraphBuffer: string[] = [];
 
-    // Headings (### → <h3>, ## → <h2>, # → <h1>)
-    html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:1.1em;font-weight:700;margin:1em 0 0.5em;">$1</h3>');
-    html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:1.25em;font-weight:700;margin:1.2em 0 0.5em;">$1</h2>');
-    html = html.replace(/^# (.+)$/gm, '<h1 style="font-size:1.5em;font-weight:700;margin:1.5em 0 0.5em;">$1</h1>');
+    // Helper: konversi inline formatting (bold, italic, code)
+    const inlineFormat = (text: string): string => {
+      return text
+        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/`(.+?)`/g, '<code style="background:#f4f4f5;padding:2px 6px;border-radius:4px;font-size:0.9em;">$1</code>');
+    };
 
-    // Bold & Italic
-    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // Helper: flush paragraph buffer
+    const flushParagraph = () => {
+      if (paragraphBuffer.length > 0) {
+        const text = paragraphBuffer.join('<br/>');
+        htmlParts.push(`<p style="margin:0.5em 0;line-height:1.8;text-align:justify;">${inlineFormat(text)}</p>`);
+        paragraphBuffer = [];
+      }
+    };
 
-    // Unordered lists (- item)
-    html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li style="margin-left:1.5em;">$1</li>');
+    // Helper: tutup list yang sedang terbuka
+    const closeList = () => {
+      if (inUl) { htmlParts.push('</ul>'); inUl = false; }
+      if (inOl) { htmlParts.push('</ol>'); inOl = false; }
+    };
 
-    // Ordered lists (1. item)
-    html = html.replace(/^\s*\d+\.\s+(.+)$/gm, '<li style="margin-left:1.5em;list-style-type:decimal;">$1</li>');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
 
-    // Line breaks — convert double newlines to paragraphs, single to <br>
-    html = html.replace(/\n\n/g, '</p><p style="margin:0.8em 0;">');
-    html = html.replace(/\n/g, '<br/>');
+      // Baris kosong → flush paragraph & tutup list
+      if (!trimmed) {
+        flushParagraph();
+        closeList();
+        continue;
+      }
 
-    // Wrap in paragraph
-    html = '<p style="margin:0.8em 0;">' + html + '</p>';
+      // Heading 1: # Title
+      const h1Match = trimmed.match(/^#\s+(.+)$/);
+      if (h1Match && !trimmed.startsWith('##')) {
+        flushParagraph();
+        closeList();
+        htmlParts.push(`<h1 style="font-size:1.6em;font-weight:700;margin:1.2em 0 0.4em;padding-bottom:0.3em;border-bottom:2px solid #e4e4e7;color:#18181b;">${inlineFormat(h1Match[1])}</h1>`);
+        continue;
+      }
 
-    return html;
+      // Heading 2: ## Subtitle
+      const h2Match = trimmed.match(/^##\s+(.+)$/);
+      if (h2Match && !trimmed.startsWith('###')) {
+        flushParagraph();
+        closeList();
+        htmlParts.push(`<h2 style="font-size:1.35em;font-weight:700;margin:1em 0 0.35em;color:#27272a;">${inlineFormat(h2Match[1])}</h2>`);
+        continue;
+      }
+
+      // Heading 3: ### Sub-subtitle
+      const h3Match = trimmed.match(/^###\s+(.+)$/);
+      if (h3Match) {
+        flushParagraph();
+        closeList();
+        htmlParts.push(`<h3 style="font-size:1.15em;font-weight:600;margin:0.8em 0 0.3em;color:#3f3f46;">${inlineFormat(h3Match[1])}</h3>`);
+        continue;
+      }
+
+      // Heading 4: #### 
+      const h4Match = trimmed.match(/^####\s+(.+)$/);
+      if (h4Match) {
+        flushParagraph();
+        closeList();
+        htmlParts.push(`<h4 style="font-size:1.05em;font-weight:600;margin:0.6em 0 0.2em;color:#52525b;">${inlineFormat(h4Match[1])}</h4>`);
+        continue;
+      }
+
+      // Horizontal rule: --- atau ***
+      if (/^[-*_]{3,}$/.test(trimmed)) {
+        flushParagraph();
+        closeList();
+        htmlParts.push('<hr style="border:none;border-top:1px solid #d4d4d8;margin:1.5em 0;"/>');
+        continue;
+      }
+
+      // Blockquote: > text
+      const bqMatch = trimmed.match(/^>\s*(.*)$/);
+      if (bqMatch) {
+        flushParagraph();
+        closeList();
+        htmlParts.push(`<blockquote style="border-left:3px solid #a1a1aa;padding-left:1em;margin:0.8em 0;color:#52525b;font-style:italic;">${inlineFormat(bqMatch[1])}</blockquote>`);
+        continue;
+      }
+
+      // Unordered list: - item atau * item
+      const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
+      if (ulMatch) {
+        flushParagraph();
+        if (inOl) { htmlParts.push('</ol>'); inOl = false; }
+        if (!inUl) {
+          htmlParts.push('<ul style="margin:0.5em 0;padding-left:1.8em;">');
+          inUl = true;
+        }
+        htmlParts.push(`<li style="margin:0.3em 0;line-height:1.7;">${inlineFormat(ulMatch[1])}</li>`);
+        continue;
+      }
+
+      // Ordered list: 1. item
+      const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+      if (olMatch) {
+        flushParagraph();
+        if (inUl) { htmlParts.push('</ul>'); inUl = false; }
+        if (!inOl) {
+          htmlParts.push('<ol style="margin:0.5em 0;padding-left:1.8em;">');
+          inOl = true;
+        }
+        htmlParts.push(`<li style="margin:0.3em 0;line-height:1.7;">${inlineFormat(olMatch[1])}</li>`);
+        continue;
+      }
+
+      // Regular text → tambahkan ke paragraph buffer
+      closeList();
+      paragraphBuffer.push(trimmed);
+    }
+
+    // Flush sisa-sisa
+    flushParagraph();
+    closeList();
+
+    return htmlParts.join('\n');
   }, []);
 
-  // Fungsi untuk menyisipkan konten AI ke paper editor
+  // Helper: Memecah markdown menjadi beberapa section berdasarkan heading utama
+  const splitMarkdownIntoSections = useCallback((md: string): string[] => {
+    // Split berdasarkan heading level 1 atau 2 (# atau ##)
+    // Tapi pertahankan heading-nya di setiap section
+    const lines = md.split('\n');
+    const sections: string[] = [];
+    let currentSection = '';
+
+    for (const line of lines) {
+      // Deteksi heading utama (# atau ##, tapi BUKAN ###)
+      if (/^#{1,2}\s+/.test(line) && !/^###/.test(line)) {
+        // Jika sudah ada konten, simpan section sebelumnya
+        if (currentSection.trim()) {
+          sections.push(currentSection.trim());
+        }
+        currentSection = line + '\n';
+      } else {
+        currentSection += line + '\n';
+      }
+    }
+    // Jangan lupa section terakhir
+    if (currentSection.trim()) {
+      sections.push(currentSection.trim());
+    }
+
+    // Jika hanya ada 1 section atau kosong, coba split berdasarkan jumlah baris
+    // agar konten panjang tetap terbagi ke beberapa halaman
+    if (sections.length <= 1 && md.length > 1500) {
+      const allLines = md.split('\n');
+      const linesPerPage = 40; // ~40 baris per halaman
+      const chunkedSections: string[] = [];
+      for (let i = 0; i < allLines.length; i += linesPerPage) {
+        chunkedSections.push(allLines.slice(i, i + linesPerPage).join('\n'));
+      }
+      return chunkedSections;
+    }
+
+    return sections;
+  }, []);
+
+  // Fungsi untuk menyisipkan konten AI ke paper editor dengan AUTO-PAGINATION
   const insertToPaper = useCallback((markdownContent: string, messageIndex?: number) => {
-    const targetPage = pageNumber - 1; // selalu ke halaman terakhir
-    const editor = document.getElementById(`main-editor-${targetPage}`);
-    if (!editor) return;
+    const sections = splitMarkdownIntoSections(markdownContent);
 
-    const htmlContent = convertMarkdownToHtml(markdownContent);
+    if (sections.length <= 1) {
+      // Konten pendek — masukkan ke halaman terakhir saja
+      const targetPage = pageNumber - 1;
+      const editor = document.getElementById(`main-editor-${targetPage}`);
+      if (!editor) return;
 
-    // Tambahkan separator jika sudah ada konten
-    const separator = editor.innerHTML.trim() ? '<hr style="border:none;border-top:1px solid #e4e4e7;margin:2em 0;"/>' : '';
-    editor.innerHTML += separator + htmlContent;
+      const htmlContent = convertMarkdownToHtml(markdownContent);
+      const separator = editor.innerHTML.trim() ? '<hr style="border:none;border-top:1px solid #e4e4e7;margin:2em 0;"/>' : '';
+      editor.innerHTML += separator + htmlContent;
+    } else {
+      // Konten panjang — distribusikan ke beberapa halaman
+      // Halaman pertama: masukkan section pertama ke halaman terakhir yang ada
+      const firstEditor = document.getElementById(`main-editor-${pageNumber - 1}`);
+      if (firstEditor) {
+        const separator = firstEditor.innerHTML.trim() ? '<hr style="border:none;border-top:1px solid #e4e4e7;margin:2em 0;"/>' : '';
+        firstEditor.innerHTML += separator + convertMarkdownToHtml(sections[0]);
+      }
+
+      // Tambah halaman baru untuk section-section berikutnya
+      const newPagesNeeded = sections.length - 1;
+      const startPageIndex = pageNumber; // halaman baru dimulai dari index ini
+
+      // Update jumlah halaman
+      setPageNumber(prev => prev + newPagesNeeded);
+
+      // Gunakan setTimeout bertingkat untuk menunggu DOM render halaman baru
+      const insertRemainingSection = (sectionIdx: number) => {
+        if (sectionIdx >= sections.length) return;
+
+        const editorId = `main-editor-${startPageIndex + (sectionIdx - 1)}`;
+        const editor = document.getElementById(editorId);
+
+        if (editor) {
+          editor.innerHTML = convertMarkdownToHtml(sections[sectionIdx]);
+          // Insert section berikutnya
+          if (sectionIdx + 1 < sections.length) {
+            setTimeout(() => insertRemainingSection(sectionIdx + 1), 150);
+          }
+        } else {
+          // DOM belum siap, coba lagi
+          setTimeout(() => insertRemainingSection(sectionIdx), 200);
+        }
+      };
+
+      // Mulai insert dari section ke-2 (index 1) setelah delay untuk render
+      setTimeout(() => insertRemainingSection(1), 300);
+    }
 
     // Show success toast
-    setToast({ message: "✅ Berhasil ditulis ke Paper!", visible: true });
+    const totalPages = sections.length > 1 ? sections.length : 1;
+    setToast({
+      message: totalPages > 1
+        ? `✅ Berhasil ditulis ke ${totalPages} halaman Paper!`
+        : '✅ Berhasil ditulis ke Paper!',
+      visible: true
+    });
     setTimeout(() => setToast({ message: "", visible: false }), 3000);
 
     // Show checkmark feedback on the button
@@ -119,9 +452,12 @@ export default function Home() {
       setTimeout(() => setInsertedIndex(null), 2500);
     }
 
-    // Scroll paper into view
-    editor.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [pageNumber, convertMarkdownToHtml]);
+    // Scroll to the first page where content was inserted
+    const firstPage = document.getElementById(`main-editor-${pageNumber - 1}`);
+    if (firstPage) {
+      firstPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [pageNumber, convertMarkdownToHtml, splitMarkdownIntoSections]);
 
   // Fungsi utama untuk mengirim pesan ke AI
   const sendToAI = async (messageText: string) => {
@@ -160,6 +496,11 @@ export default function Home() {
       const reply = data.data?.message || data.reply || data.text || data.response || (typeof data === 'string' ? data : "Pesan berhasil diterima.");
 
       setChatHistory(prev => [...prev, { role: "friend", content: reply }]);
+
+      // Auto-insert ke paper setelah response diterima
+      setTimeout(() => {
+        insertToPaper(reply);
+      }, 100);
     } catch (error) {
       console.error("Error fetching from API:", error);
       setChatHistory(prev => [...prev, { role: "friend", content: "Maaf, saya sedang kesulitan terhubung dengan LibraAI saat ini." }]);
@@ -255,30 +596,42 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                className="relative flex flex-col bg-white dark:bg-zinc-900 shadow-2xl rounded-sm border border-zinc-200/80 dark:border-zinc-800 z-10 transition-all duration-500 ease-in-out w-full min-h-[85vh]"
+                className={`relative flex flex-col bg-white dark:bg-zinc-900 shadow-2xl rounded-sm border-2 z-10 transition-all duration-300 ease-in-out w-full min-h-[85vh] cursor-pointer ${selectedPage === index
+                    ? 'border-blue-500 dark:border-blue-400 shadow-blue-200/30 dark:shadow-blue-900/20'
+                    : 'border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
                 style={{
                   backgroundColor: "var(--paper-color, #ffffff)",
                 }}
+                onClick={() => setSelectedPage(index)}
               >
 
-                {/* Only show paper controls on the FIRST page to manage global page count */}
-                {index === 0 && (
+                {/* Page number badge — selalu tampil di kiri atas setiap halaman */}
+                <div className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[10px] font-bold z-20 transition-colors ${selectedPage === index
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400'
+                  }`}>
+                  {index + 1}
+                </div>
+
+                {/* Paper controls — tampil di halaman yang di-select */}
+                {selectedPage === index && (
                   <div className="absolute top-16 right-2 sm:right-auto sm:left-[100%] sm:ml-4 flex flex-col items-center p-1.5 gap-2 bg-white dark:bg-zinc-800 shadow-sm border border-zinc-200 dark:border-zinc-700 rounded-2xl z-40">
                     <button
-                      onClick={handleAddPaper}
+                      onClick={(e) => { e.stopPropagation(); handleAddPaper(); }}
                       className="p-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition-all"
                       title="Tambah Halaman"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
                     <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                      {pageNumber}
+                      {index + 1}/{pageNumber}
                     </span>
                     <button
-                      onClick={handleDeletePaper}
+                      onClick={(e) => { e.stopPropagation(); handleDeletePaper(); }}
                       disabled={pageNumber <= 1}
-                      className="p-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-transparent"
-                      title="Hapus Halaman"
+                      className="p-2 text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 bg-zinc-50 dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-transparent"
+                      title={`Hapus Halaman ${index + 1}`}
                     >
                       <Minus className="w-4 h-4" />
                     </button>
@@ -301,7 +654,7 @@ export default function Home() {
                   id={`main-editor-${index}`}
                   contentEditable
                   suppressContentEditableWarning
-                  className="absolute inset-0 w-full h-full outline-none py-16 pr-12 pl-24 text-zinc-900 dark:text-zinc-100 scrollbar-hide overflow-y-auto whitespace-pre-wrap focus:outline-none z-10"
+                  className="absolute inset-0 w-full h-full outline-none py-16 pr-12 pl-24 text-zinc-900 dark:text-zinc-100 scrollbar-hide overflow-hidden whitespace-pre-wrap focus:outline-none z-10"
                   data-placeholder={index === 0 ? "Mulai menulis naskah atau klik area ini..." : ""}
                   style={{
                     fontFamily: "var(--editor-font-family, 'Inter')",
@@ -381,8 +734,8 @@ export default function Home() {
                             <button
                               onClick={() => insertToPaper(msg.content, idx)}
                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${insertedIndex === idx
-                                  ? 'bg-green-500/20 text-green-300 dark:text-green-600'
-                                  : 'bg-white/10 dark:bg-zinc-800/50 text-white/70 dark:text-zinc-500 hover:bg-white/20 dark:hover:bg-zinc-700/50 hover:text-white dark:hover:text-zinc-300'
+                                ? 'bg-green-500/20 text-green-300 dark:text-green-600'
+                                : 'bg-white/10 dark:bg-zinc-800/50 text-white/70 dark:text-zinc-500 hover:bg-white/20 dark:hover:bg-zinc-700/50 hover:text-white dark:hover:text-zinc-300'
                                 }`}
                               title="Tulis ke Paper"
                             >
@@ -414,45 +767,46 @@ export default function Home() {
             )}
           </AnimatePresence>
 
+          {/* Quick Action Buttons — muncul saat chat belum aktif */}
+          <AnimatePresence>
+            {!isChatActive && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5, transition: { duration: 0.15 } }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center justify-center gap-2 mb-3 pointer-events-auto"
+              >
+                <button
+                  onClick={() => setQuickActionModal({ open: true, type: 'paper_research', label: 'Research' })}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-lg border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  Buat Research
+                </button>
+                <button
+                  onClick={() => setQuickActionModal({ open: true, type: 'paper_skripsi', label: 'Skripsi' })}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-lg border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
+                >
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  Buat Skripsi
+                </button>
+                <button
+                  onClick={() => setQuickActionModal({ open: true, type: 'paper_artikel', label: 'Artikel Ilmiah' })}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-lg border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
+                >
+                  <Newspaper className="w-3.5 h-3.5" />
+                  Buat Artikel
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Search Input — selalu terlihat di bawah layar */}
           <motion.div
             layout
             className="w-full max-w-xl relative group shrink-0 pointer-events-auto"
           >
-            {/* Quick Action Buttons — muncul saat chat belum aktif */}
-            <AnimatePresence>
-              {!isChatActive && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 5, transition: { duration: 0.15 } }}
-                  transition={{ duration: 0.3 }}
-                  className="flex items-center justify-center gap-2 mb-3"
-                >
-                  <button
-                    onClick={() => setQuickActionModal({ open: true, type: 'paper_research', label: 'Research' })}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-lg border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    Buat Research
-                  </button>
-                  <button
-                    onClick={() => setQuickActionModal({ open: true, type: 'paper_skripsi', label: 'Skripsi' })}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-lg border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
-                  >
-                    <GraduationCap className="w-3.5 h-3.5" />
-                    Buat Skripsi
-                  </button>
-                  <button
-                    onClick={() => setQuickActionModal({ open: true, type: 'paper_artikel', label: 'Artikel Ilmiah' })}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-lg border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
-                  >
-                    <Newspaper className="w-3.5 h-3.5" />
-                    Buat Artikel
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
             <div className={`absolute inset-0 bg-zinc-900/5 dark:bg-white/5 rounded-2xl blur-xl transition-all duration-300 ${isFocused ? "opacity-100 scale-105" : "opacity-0 scale-100"}`} />
 
             <div className={`relative flex items-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border-2 rounded-2xl p-2 transition-colors duration-300 shadow-2xl shadow-zinc-300/30 dark:shadow-black/50 ${isFocused ? "border-zinc-900 dark:border-white" : "border-zinc-200/80 dark:border-zinc-800/80"}`}>
