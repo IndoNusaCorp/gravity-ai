@@ -597,8 +597,8 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                 className={`relative flex flex-col bg-white dark:bg-zinc-900 shadow-2xl rounded-sm border-2 z-10 transition-all duration-300 ease-in-out w-full min-h-[85vh] cursor-pointer ${selectedPage === index
-                    ? 'border-blue-500 dark:border-blue-400 shadow-blue-200/30 dark:shadow-blue-900/20'
-                    : 'border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  ? 'border-blue-500 dark:border-blue-400 shadow-blue-200/30 dark:shadow-blue-900/20'
+                  : 'border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
                   }`}
                 style={{
                   backgroundColor: "var(--paper-color, #ffffff)",
@@ -608,35 +608,12 @@ export default function Home() {
 
                 {/* Page number badge — selalu tampil di kiri atas setiap halaman */}
                 <div className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[10px] font-bold z-20 transition-colors ${selectedPage === index
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400'
                   }`}>
                   {index + 1}
                 </div>
 
-                {/* Paper controls — tampil di halaman yang di-select */}
-                {selectedPage === index && (
-                  <div className="absolute top-16 right-2 sm:right-auto sm:left-[100%] sm:ml-4 flex flex-col items-center p-1.5 gap-2 bg-white dark:bg-zinc-800 shadow-sm border border-zinc-200 dark:border-zinc-700 rounded-2xl z-40">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleAddPaper(); }}
-                      className="p-2 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition-all"
-                      title="Tambah Halaman"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                    <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                      {index + 1}/{pageNumber}
-                    </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeletePaper(); }}
-                      disabled={pageNumber <= 1}
-                      className="p-2 text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 bg-zinc-50 dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-transparent"
-                      title={`Hapus Halaman ${index + 1}`}
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
 
 
                 {/* Typable Document Area (Area Tempat Mengetik Naskah) */}
@@ -696,6 +673,38 @@ export default function Home() {
             ))}
           </div>
         </main>
+
+        {/* Floating Paper Controls — ngambang di sisi kanan layar */}
+        <AnimatePresence>
+          {selectedPage !== null && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="fixed top-20 sm:top-30 right-6 sm:right-10 xl:right-[calc(49.3%-var(--paper-max-width,794px)/2-3.5rem)] flex flex-col items-center p-1.5 gap-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-xl shadow-lg border border-zinc-200 dark:border-zinc-700 rounded-3xl z-50"
+            >
+              <button
+                onClick={() => handleAddPaper()}
+                className="p-2.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition-all"
+                title="Tambah Halaman"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                {(selectedPage ?? 0) + 1}/{pageNumber}
+              </span>
+              <button
+                onClick={() => handleDeletePaper()}
+                disabled={pageNumber <= 1}
+                className="p-2.5 text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 bg-zinc-50 dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-transparent"
+                title={`Hapus Halaman ${(selectedPage ?? 0) + 1}`}
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Floating Chat & Search Overlay — ngambang di atas semua konten */}
         <div className="fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center pointer-events-none px-4 sm:px-12">
