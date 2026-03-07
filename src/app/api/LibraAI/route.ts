@@ -212,6 +212,12 @@ export async function POST(req: NextRequest) {
         Kamu menanyakan untuk memastikan apakah user ingin melanjutkan atau tidak.
         Kamu menanyakan untuk di buatkan research, skripsi, atau artikel ilmiah lagi atau tidak, KECUALI saat sedang mengeksekusi fitur tambahan spesifik.
         Selalu ingat percakapan sebelumnya dan pastikan percakapan tetap relevan dan nyambung dengan konteks yang diberikan pada ===== RIWAYAT PERCAKAPAN SEBELUMNYA =====.
+        ${isPaperMode ? `
+PENTING: Kamu sedang dalam MODE PAPER. Kamu HARUS langsung menulis dokumen tanpa kalimat pembuka atau basa-basi apapun.
+JANGAN tulis kalimat seperti "Tentu, ini draf..." atau "Berikut adalah..." atau "Ini dia...". 
+LANGSUNG mulai dari judul dokumen (heading markdown #) tanpa kata pengantar apapun.
+JANGAN tambahkan komentar atau catatan penutup setelah dokumen selesai.
+` : ''}
         ${historyContext}
         ${brainContext}
         `;

@@ -501,11 +501,6 @@ export default function Home() {
       const reply = data.data?.message || data.reply || data.text || data.response || (typeof data === 'string' ? data : "Pesan berhasil diterima.");
 
       setChatHistory(prev => [...prev, { role: "friend", content: reply }]);
-
-      // Auto-insert ke paper setelah response diterima
-      setTimeout(() => {
-        insertToPaper(reply);
-      }, 100);
     } catch (error) {
       console.error("Error fetching from API:", error);
       setChatHistory(prev => [...prev, { role: "friend", content: "Maaf, saya sedang kesulitan terhubung dengan LibraAI saat ini." }]);
@@ -546,10 +541,18 @@ export default function Home() {
 
       setChatHistory(prev => [...prev, { role: "friend", content: reply }]);
 
+      // Bersihkan teks pembuka/basa-basi sebelum heading markdown pertama
+      // Contoh: "Tentu, ini draf artikel... \n\n# Judul" → "# Judul"
+      let cleanedReply = reply;
+      const headingIndex = reply.search(/^#\s+/m);
+      if (headingIndex > 0) {
+        cleanedReply = reply.substring(headingIndex);
+      }
+
       // Auto-insert ke paper setelah response diterima
       // Kita perlu delay sedikit agar state terupdate dulu
       setTimeout(() => {
-        insertToPaper(reply);
+        insertToPaper(cleanedReply);
       }, 100);
 
     } catch (error) {
