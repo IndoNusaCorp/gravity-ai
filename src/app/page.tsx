@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { SidebarLeft } from "@/components/SidebarLeft";
 import { SidebarRight } from "@/components/SidebarRight";
-import { Search, Send, X, Plus, Minus, FileText, BookOpen, GraduationCap, Newspaper, Check, PenTool } from "lucide-react";
+import { Search, Send, X, Plus, Minus, FileText, BookOpen, GraduationCap, Newspaper, Check, PenTool, Link as LinkIcon, Upload, Edit3, Calculator, AlignLeft, MessageSquare, Table, Network, MoreHorizontal } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import Markdown from "markdown-to-jsx";
 
@@ -25,6 +25,11 @@ export default function Home() {
   // State untuk quick action modal
   const [quickActionModal, setQuickActionModal] = useState<{ open: boolean; type: string; label: string }>({ open: false, type: "", label: "" });
   const [quickActionTopic, setQuickActionTopic] = useState("");
+
+  // State untuk Fitur AI Tambahan (Citation, Paraphrase, Math, Advisor, Table, Outline)
+  const [featureModal, setFeatureModal] = useState<{ open: boolean; type: 'citation' | 'paraphrase' | 'math' | 'advisor' | 'table' | 'outline' | '' }>({ open: false, type: '' });
+  const [featureInput, setFeatureInput] = useState("");
+  const [isMoreFeaturesOpen, setIsMoreFeaturesOpen] = useState(false);
 
   // State to track which message index was recently inserted to paper (for icon feedback)
   const [insertedIndex, setInsertedIndex] = useState<number | null>(null);
@@ -555,6 +560,94 @@ export default function Home() {
     }
   };
 
+  // --- FITUR 1: Auto-Citation ---
+  const handleAutoCitation = () => {
+    if (!featureInput.trim()) return;
+    const topic = `Buatkan daftar pustaka format APA atau IEEE secara akurat berdasarkan referensi (Judul/DOI/Link) berikut:\n${featureInput}`;
+    setFeatureModal({ open: false, type: '' });
+    setFeatureInput('');
+    sendToAI(topic);
+  };
+
+  // --- FITUR 2: Chat with Papers (Upload PDF / Jurnal) ---
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setToast({ message: `✅ Membaca dokumen ${file.name}...`, visible: true });
+      setTimeout(() => setToast({ message: "", visible: false }), 3000);
+
+      const topic = `[SISTEM: Pengguna mengunggah referensi "${file.name}"]\nTolong bantu saya menganalisis, mencari research gap, atau merangkum dokumen yang saya unggah ini. Apakah kamu siap?`;
+      sendToAI(topic);
+      // Reset input supaya bisa upload file yang sama lagi
+      e.target.value = '';
+    }
+  };
+
+  // --- FITUR 3: Academic Paraphraser ---
+  const handleParaphrase = () => {
+    if (!featureInput.trim()) return;
+    const topic = `Tolong tulis ulang teks berikut agar menggunakan gaya bahasa akademis, baku, ilmiah, dan objektif:\n\n"${featureInput}"`;
+    setFeatureModal({ open: false, type: '' });
+    setFeatureInput('');
+    sendToAI(topic);
+  };
+
+  // --- FITUR 4: Integrasi Math Equation ---
+  const handleMathEquation = () => {
+    if (!featureInput.trim()) return;
+    const topic = `Buatkan rumus matematika menggunakan format LaTeX / text untuk deskripsi berikut:\n\n"${featureInput}"\n\nTampilkan hasilnya di dalam blok kode (code block) agar format stabil dan mudah disalin.`;
+    setFeatureModal({ open: false, type: '' });
+    setFeatureInput('');
+    sendToAI(topic);
+  };
+
+  // --- FITUR 6: Virtual Advisor ---
+  const handleVirtualAdvisor = () => {
+    if (!featureInput.trim()) return;
+    const topic = `Bertindaklah sebagai dosen pembimbing skripsi/penelitian yang kritis. Berikan evaluasi, kritik, dan saran perbaikan yang membangun untuk draf teks berikut:\n\n"${featureInput}"`;
+    setFeatureModal({ open: false, type: '' });
+    setFeatureInput('');
+    sendToAI(topic);
+  };
+
+  // --- FITUR 7: Data & Table Formatter ---
+  const handleTableFormatter = () => {
+    if (!featureInput.trim()) return;
+    const topic = `Tolong ubah data mentah berikut menjadi sebuah format tabel (Markdown Table) yang rapi, terstruktur, dan mudah dibaca:\n\n"${featureInput}"`;
+    setFeatureModal({ open: false, type: '' });
+    setFeatureInput('');
+    sendToAI(topic);
+  };
+
+  // --- FITUR 8: Smart Outline Builder ---
+  const handleOutlineBuilder = () => {
+    if (!featureInput.trim()) return;
+    const topic = `Buatkan struktur outline (kerangka tulisan/mind map) yang sistematis untuk topik penelitian berikut:\n\n"${featureInput}"\n\nTolong sertakan poin-poin penting yang wajib dibahas pada setiap bab dan sub-babnya.`;
+    setFeatureModal({ open: false, type: '' });
+    setFeatureInput('');
+    sendToAI(topic);
+  };
+
+  // --- FITUR 5: Auto-Generate Abstract ---
+  const handleAutoAbstract = () => {
+    let fullText = "";
+    for (let i = 0; i < pageNumber; i++) {
+      const editor = document.getElementById(`main-editor-${i}`);
+      if (editor) {
+        fullText += editor.innerText + "\\n\\n";
+      }
+    }
+
+    if (fullText.trim().length < 50) {
+      setToast({ message: "⚠️ Teks di paper terlalu pendek untuk dibuatkan abstrak.", visible: true });
+      setTimeout(() => setToast({ message: "", visible: false }), 3000);
+      return;
+    }
+
+    const topic = `Buatkan abstrak (sekitar 200-250 kata) berbahasa Indonesia berdasarkan keseluruhan isi naskah paper saya berikut ini:\n\n${fullText.substring(0, 3000)}...`;
+    sendToAI(topic);
+  };
+
   const handleSend = () => sendToAI(inputValue);
 
   const handleStart = () => {
@@ -807,6 +900,73 @@ export default function Home() {
                   <Newspaper className="w-3.5 h-3.5" />
                   Buat Artikel
                 </button>
+                <div className="w-[1px] h-6 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
+                <button
+                  onClick={() => setIsMoreFeaturesOpen(!isMoreFeaturesOpen)}
+                  className={`flex items-center justify-center p-2 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95 border ${isMoreFeaturesOpen
+                      ? 'bg-zinc-200 dark:bg-zinc-700 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white'
+                      : 'bg-white/90 dark:bg-zinc-800/90 border-zinc-200/80 dark:border-zinc-700/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                    }`}
+                  title="Fitur Lainnya"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Quick Action Buttons — Row 2 (AI Features 1-8) */}
+          <AnimatePresence>
+            {!isChatActive && isMoreFeaturesOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                exit={{ opacity: 0, height: 0, scale: 0.95, transition: { duration: 0.15 } }}
+                transition={{ duration: 0.3 }}
+                className="flex flex-wrap items-center justify-center gap-2 mb-4 pointer-events-auto px-4 max-w-3xl overflow-hidden"
+              >
+                {/* 1. Auto-Citation */}
+                <button onClick={() => setFeatureModal({ open: true, type: 'citation' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/80 dark:border-blue-800/50 rounded-lg text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                  <LinkIcon className="w-3.5 h-3.5" /> Sitasi & Pustaka
+                </button>
+
+                {/* 2. Upload PDF (Chat with Papers) */}
+                <div className="relative">
+                  <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="Upload Jurnal PDF" />
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50/80 dark:bg-purple-900/20 border border-purple-200/80 dark:border-purple-800/50 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md pointer-events-none">
+                    <Upload className="w-3.5 h-3.5" /> Chat w/ Papers
+                  </button>
+                </div>
+
+                {/* 3. Paraphraser */}
+                <button onClick={() => setFeatureModal({ open: true, type: 'paraphrase' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50/80 dark:bg-emerald-900/20 border border-emerald-200/80 dark:border-emerald-800/50 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                  <Edit3 className="w-3.5 h-3.5" /> Academic Tone
+                </button>
+
+                {/* 4. Math Equation LaTeX */}
+                <button onClick={() => setFeatureModal({ open: true, type: 'math' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50/80 dark:bg-amber-900/20 border border-amber-200/80 dark:border-amber-800/50 rounded-lg text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                  <Calculator className="w-3.5 h-3.5" /> Math Equation
+                </button>
+
+                {/* 5. Auto Abstract */}
+                <button onClick={handleAutoAbstract} className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50/80 dark:bg-rose-900/20 border border-rose-200/80 dark:border-rose-800/50 rounded-lg text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                  <AlignLeft className="w-3.5 h-3.5" /> Auto Abstrak
+                </button>
+
+                {/* 6. Virtual Advisor */}
+                <button onClick={() => setFeatureModal({ open: true, type: 'advisor' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 dark:bg-indigo-900/20 border border-indigo-200/80 dark:border-indigo-800/50 rounded-lg text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                  <MessageSquare className="w-3.5 h-3.5" /> Virtual Advisor
+                </button>
+
+                {/* 7. Table Formatter */}
+                <button onClick={() => setFeatureModal({ open: true, type: 'table' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50/80 dark:bg-cyan-900/20 border border-cyan-200/80 dark:border-cyan-800/50 rounded-lg text-xs font-semibold text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                  <Table className="w-3.5 h-3.5" /> Data ke Tabel
+                </button>
+
+                {/* 8. Smart Outline */}
+                <button onClick={() => setFeatureModal({ open: true, type: 'outline' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50/80 dark:bg-orange-900/20 border border-orange-200/80 dark:border-orange-800/50 rounded-lg text-xs font-semibold text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                  <Network className="w-3.5 h-3.5" /> Smart Outline
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -860,6 +1020,112 @@ export default function Home() {
       </AnimatePresence>
 
       {/* Quick Action Modal — Dialog untuk masukkan topik */}
+      {/* Feature Input Modal */}
+      <AnimatePresence>
+        {featureModal.open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-zinc-200 dark:border-zinc-800"
+            >
+              <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+                    {featureModal.type === 'citation' && <LinkIcon className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
+                    {featureModal.type === 'paraphrase' && <Edit3 className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
+                    {featureModal.type === 'math' && <Calculator className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
+                    {featureModal.type === 'advisor' && <MessageSquare className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
+                    {featureModal.type === 'table' && <Table className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
+                    {featureModal.type === 'outline' && <Network className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
+                  </div>
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                    {featureModal.type === 'citation' && 'Buat Sitasi / Daftar Pustaka'}
+                    {featureModal.type === 'paraphrase' && 'Academic Tone Paraphraser'}
+                    {featureModal.type === 'math' && 'Buat Rumus Matematika'}
+                    {featureModal.type === 'advisor' && 'Virtual Advisor (Kritikus AI)'}
+                    {featureModal.type === 'table' && 'Data & Table Formatter'}
+                    {featureModal.type === 'outline' && 'Smart Outline Builder'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => { setFeatureModal({ open: false, type: '' }); setFeatureInput(''); }}
+                  className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  {featureModal.type === 'citation' && 'Masukkan Judul / Link Jurnal / DOI:'}
+                  {featureModal.type === 'paraphrase' && 'Masukkan Teks yang Ingin Diubah:'}
+                  {featureModal.type === 'math' && 'Jelaskan Rumus yang Ingin Dibuat:'}
+                  {featureModal.type === 'advisor' && 'Masukkan Teks/Draf yang Ingin Dievaluasi:'}
+                  {featureModal.type === 'table' && 'Masukkan Data Mentah (CSV/Teks):'}
+                  {featureModal.type === 'outline' && 'Masukkan Topik/Judul Penelitian:'}
+                </label>
+                <textarea
+                  autoFocus
+                  value={featureInput}
+                  onChange={(e) => setFeatureInput(e.target.value)}
+                  placeholder={
+                    featureModal.type === 'citation' ? 'Contoh: https://doi.org/10.1016/j.eswa.2023...' :
+                      featureModal.type === 'paraphrase' ? 'Tulis teks santai/berantakan di sini...' :
+                        featureModal.type === 'math' ? 'Contoh: Rumus regresi linear berganda dengan 2 variabel independen' :
+                          featureModal.type === 'advisor' ? 'Contoh: Latar belakang ini membahas tentang...' :
+                            featureModal.type === 'table' ? 'Contoh: Nama, Umur, Nilai\nAndi, 20, 85\nBudi, 21, 90' :
+                              'Contoh: Pengaruh AI terhadap Produktivitas Mahasiswa'
+                  }
+                  rows={4}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition-all resize-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (featureModal.type === 'citation') handleAutoCitation();
+                      else if (featureModal.type === 'paraphrase') handleParaphrase();
+                      else if (featureModal.type === 'math') handleMathEquation();
+                      else if (featureModal.type === 'advisor') handleVirtualAdvisor();
+                      else if (featureModal.type === 'table') handleTableFormatter();
+                      else if (featureModal.type === 'outline') handleOutlineBuilder();
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-950/50 border-t border-zinc-100 dark:border-zinc-800 flex justify-end gap-2">
+                <button
+                  onClick={() => { setFeatureModal({ open: false, type: '' }); setFeatureInput(''); }}
+                  className="px-4 py-2 text-sm font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  disabled={!featureInput.trim()}
+                  onClick={() => {
+                    if (featureModal.type === 'citation') handleAutoCitation();
+                    else if (featureModal.type === 'paraphrase') handleParaphrase();
+                    else if (featureModal.type === 'math') handleMathEquation();
+                    else if (featureModal.type === 'advisor') handleVirtualAdvisor();
+                    else if (featureModal.type === 'table') handleTableFormatter();
+                    else if (featureModal.type === 'outline') handleOutlineBuilder();
+                  }}
+                  className="px-5 py-2 text-sm font-semibold bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm active:scale-95"
+                >
+                  Minta AI
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {quickActionModal.open && (
           <motion.div

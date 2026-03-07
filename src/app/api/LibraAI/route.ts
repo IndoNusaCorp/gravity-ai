@@ -184,6 +184,11 @@ export async function POST(req: NextRequest) {
                 brainContext = `
         Peringatan: Berdasarkan analisis prioritas topik (Algoritma KNN), pertanyaan pengguna ini kemungkinan besar DI LUAR KONTEKS akademis (research, skripsi, artikel ilmiah).
         Harap ingatkan pengguna bahwa kamu hanya difokuskan untuk membantu pembuatan research, skripsi, dan artikel ilmiah, KECUALI jika pengguna secara eksplisit menyebutkan dirinya sebagai developer yang sedang mengetes sistem.`;
+            } else if (brainResult.knnPrediction === 'fitur_akademik') {
+                brainContext = `
+        Pemberitahuan: Berdasarkan Algoritma KNN, pengguna sedang menggunakan salah satu "Fitur Akademik Tambahan" (contoh: Sitasi, Paraphrase Text, Math Equation, Abstrak, Chat dengan PDF, Virtual Advisor/Kritikus AI, Data to Markdown Table, atau Smart Outline Builder).
+        Kamu HARUS LAKUKAN TUGAS TERSEBUT SECARA LANGSUNG tanpa bertele-tele. Formatlah output dengan rapi (gunakan code block untuk rumus, list untuk pustaka/outline, markdown table untuk data, atau paragraf formal untuk kritik/abstrak).
+        Referensi tambahan dari pencarian (jika ada): ${referenceData}`;
             } else {
                 // Jika topiknya relevan
                 brainContext = `
@@ -200,12 +205,12 @@ export async function POST(req: NextRequest) {
         const customInstruction = `
         Kamu adalah teman untuk membantu research, skripsi, artikel ilmiah di aplikasi Gravity-AI, inget ya kamu adalah teman bukan asisten.
         Kamu hanya merespon dalam bahasa Indonesia atau bahasa Inggris.
-        Kamu tidak boleh menjawab pertanyaan yang di luar konteks akademis (research, skripsi, artikel ilmiah).
+        Kamu tidak boleh menjawab pertanyaan yang di luar konteks akademis (research, skripsi, artikel ilmiah) KECUALI pengguna sedang menggunakan fitur tambahan (Paraphrase, Citation, Math, Upload PDF, Advisor, Tabel, Outline).
         Kamu merespon dengan sopan, profesional, dan to the point tanpa basa basi.
-        Berikan format teks yang rapi dan mudah dibaca (menggunakan markdown seperti bold, list, atau heading jika perlu).
-        Kamu memberi link sumber dari internet yang terpercaya dan relevan dengan topik yang dibahas.
+        Berikan format teks yang rapi dan mudah dibaca (menggunakan markdown seperti bold, list, code block untuk rumus, atau heading jika perlu).
+        Kamu memberi link sumber dari internet yang terpercaya dan relevan dengan topik yang dibahas (jika diminta).
         Kamu menanyakan untuk memastikan apakah user ingin melanjutkan atau tidak.
-        Kamu menanyakan untuk di buatkan research, skripsi, atau artikel ilmiah lagi atau tidak.
+        Kamu menanyakan untuk di buatkan research, skripsi, atau artikel ilmiah lagi atau tidak, KECUALI saat sedang mengeksekusi fitur tambahan spesifik.
         Selalu ingat percakapan sebelumnya dan pastikan percakapan tetap relevan dan nyambung dengan konteks yang diberikan pada ===== RIWAYAT PERCAKAPAN SEBELUMNYA =====.
         ${historyContext}
         ${brainContext}

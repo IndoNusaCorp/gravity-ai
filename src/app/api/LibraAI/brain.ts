@@ -26,6 +26,16 @@ const TrainingData: DataPoint[] = [
     { keywords: ['format', 'ieee', 'apa', 'harvard', 'penulisan', 'kutipan', 'plagiarisme', 'turnitin', 'mendeley'], label: 'artikel' },
     { keywords: ['konferensi', 'prosiding', 'scopus', 'sinta', 'peer', 'reviewed', 'metodologi', 'hasil', 'pembahasan'], label: 'artikel' },
 
+    // Fitur Tambahan (Citation, Paraphraser, Math, Abstract, Chat w/ Papers, Advisor, Table, Outline)
+    { keywords: ['sitasi', 'referensi', 'daftar', 'pustaka', 'apa', 'ieee', 'kutipan', 'jurnal', 'doi', 'link'], label: 'fitur_akademik' },
+    { keywords: ['paraphrase', 'parafrase', 'rewrite', 'tulis', 'ulang', 'bahasa', 'akademis', 'baku', 'ilmiah', 'objektif'], label: 'fitur_akademik' },
+    { keywords: ['matematika', 'rumus', 'persamaan', 'latex', 'hitung', 'kalkulus', 'statistik', 'regresi'], label: 'fitur_akademik' },
+    { keywords: ['abstrak', 'abstract', 'ringkasan', 'kesimpulan', 'naskah', 'teks', 'simpulkan', 'rangkum'], label: 'fitur_akademik' },
+    { keywords: ['upload', 'pdf', 'dokumen', 'analisis', 'research', 'gap', 'baca', 'file'], label: 'fitur_akademik' },
+    { keywords: ['kritik', 'saran', 'dosen', 'pembimbing', 'evaluasi', 'advisor', 'perbaiki', 'koreksi', 'review'], label: 'fitur_akademik' },
+    { keywords: ['tabel', 'table', 'data', 'format', 'csv', 'baris', 'kolom', 'mentah'], label: 'fitur_akademik' },
+    { keywords: ['outline', 'kerangka', 'mind', 'map', 'struktur', 'bab', 'sub-bab', 'poin'], label: 'fitur_akademik' },
+
     // Pertanyaan umum / percakapan santai (Di luar research)
     { keywords: ['halo', 'hai', 'siapa', 'kamu', 'apa', 'kabar', 'selamat', 'pagi', 'siang', 'malam', 'nama', 'developer', 'bantu', 'tolong'], label: 'umum' },
     { keywords: ['berita', 'hari', 'ini', 'cuaca', 'film', 'lagu', 'musik', 'rekomendasi', 'makan', 'resep', 'cara', 'membuat', 'game'], label: 'umum' },
