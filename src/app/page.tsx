@@ -215,8 +215,70 @@ export default function Home() {
     ]);
   };
 
+  // Helper: Render cover page block menjadi HTML halaman sampul akademis
+  const renderCoverPageHtml = useCallback((coverBlock: string): string => {
+    const fields: Record<string, string> = {};
+    const lines = coverBlock.split('\n');
+    for (const line of lines) {
+      const match = line.trim().match(/^(TITLE|DOCTYPE|DESCRIPTION|AUTHOR|NIM|DEPARTMENT|FACULTY|UNIVERSITY|YEAR):\s*(.+)$/i);
+      if (match) {
+        fields[match[1].toUpperCase()] = match[2].trim();
+      }
+    }
+
+    const title = fields['TITLE'] || '[Judul Dokumen]';
+    const docType = fields['DOCTYPE'] || '';
+    const description = fields['DESCRIPTION'] || '';
+    const author = fields['AUTHOR'] || '[Nama Penulis]';
+    const nim = fields['NIM'] || '[NIM]';
+    const department = fields['DEPARTMENT'] || '[Program Studi]';
+    const faculty = fields['FACULTY'] || '[Fakultas]';
+    const university = fields['UNIVERSITY'] || '[Nama Universitas]';
+    const year = fields['YEAR'] || '[Tahun]';
+
+    return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:space-between;min-height:85vh;text-align:center;padding:2em 2em;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0.5em;margin-top:2em;">
+        <h1 style="font-size:1.4em;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;line-height:1.5;color:#18181b;margin:0;padding:0;border:none;max-width:85%;">${title}</h1>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1.2em;">
+        ${docType ? `<h2 style="font-size:1.25em;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#18181b;margin:0;">${docType}</h2>` : ''}
+        ${description ? `<p style="font-size:0.95em;font-style:italic;color:#3f3f46;line-height:1.6;max-width:80%;margin:0;">${description}</p>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0.3em;">
+        <p style="font-size:1.05em;font-weight:700;color:#18181b;margin:0;">${author}</p>
+        <p style="font-size:1em;font-weight:400;color:#3f3f46;margin:0;">${nim}</p>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0.3em;margin-bottom:2em;">
+        <p style="font-size:1em;font-weight:700;text-transform:uppercase;color:#18181b;margin:0;">${department}</p>
+        <p style="font-size:1em;font-weight:700;text-transform:uppercase;color:#18181b;margin:0;">${faculty}</p>
+        <p style="font-size:1em;font-weight:700;text-transform:uppercase;color:#18181b;margin:0;">${university}</p>
+        <p style="font-size:1em;font-weight:700;color:#18181b;margin:0;">${year}</p>
+      </div>
+    </div>`;
+  }, []);
+
   // Helper: Konversi Markdown ke HTML terstruktur dan rapi untuk paper akademis
   const convertMarkdownToHtml = useCallback((md: string): string => {
+    // Deteksi cover page block
+    const coverStartIdx = md.indexOf('---COVER_PAGE_START---');
+    const coverEndIdx = md.indexOf('---COVER_PAGE_END---');
+
+    if (coverStartIdx !== -1 && coverEndIdx !== -1 && coverEndIdx > coverStartIdx) {
+      const coverBlock = md.substring(coverStartIdx + '---COVER_PAGE_START---'.length, coverEndIdx);
+      const coverHtml = renderCoverPageHtml(coverBlock);
+      // Hanya return cover page HTML (sisa konten dihandle oleh splitMarkdownIntoSections)
+      const beforeCover = md.substring(0, coverStartIdx).trim();
+      const afterCover = md.substring(coverEndIdx + '---COVER_PAGE_END---'.length).trim();
+
+      // Jika ada konten setelah cover page, proses secara terpisah
+      if (afterCover) {
+        // Ini seharusnya tidak terjadi karena splitMarkdownIntoSections sudah memisahkan
+        // Tapi sebagai fallback, gabungkan
+        return coverHtml;
+      }
+      return coverHtml;
+    }
+
     const lines = md.split('\n');
     const htmlParts: string[] = [];
     let inUl = false;
@@ -229,14 +291,14 @@ export default function Home() {
         .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/`(.+?)`/g, '<code style="background:#f4f4f5;padding:2px 6px;border-radius:4px;font-size:0.9em;">$1</code>');
+        .replace(/`(.+?)`/g, '<code style="background:#f0f0f3;padding:2px 7px;border-radius:4px;font-size:0.88em;font-family:\'SF Mono\',\'Fira Code\',\'Cascadia Code\',monospace;color:#18181b;">$1</code>');
     };
 
     // Helper: flush paragraph buffer
     const flushParagraph = () => {
       if (paragraphBuffer.length > 0) {
         const text = paragraphBuffer.join('<br/>');
-        htmlParts.push(`<p style="margin:0.5em 0;line-height:1.8;text-align:justify;">${inlineFormat(text)}</p>`);
+        htmlParts.push(`<p style="margin:0.6em 0 0.8em;line-height:2;text-align:justify;text-indent:2em;color:#1a1a1a;">${inlineFormat(text)}</p>`);
         paragraphBuffer = [];
       }
     };
@@ -251,6 +313,11 @@ export default function Home() {
       const line = lines[i];
       const trimmed = line.trim();
 
+      // Skip cover page markers jika masih ada
+      if (trimmed === '---COVER_PAGE_START---' || trimmed === '---COVER_PAGE_END---') {
+        continue;
+      }
+
       // Baris kosong → flush paragraph & tutup list
       if (!trimmed) {
         flushParagraph();
@@ -258,47 +325,47 @@ export default function Home() {
         continue;
       }
 
-      // Heading 1: # Title
+      // Heading 1: # Title — Judul utama dokumen
       const h1Match = trimmed.match(/^#\s+(.+)$/);
       if (h1Match && !trimmed.startsWith('##')) {
         flushParagraph();
         closeList();
-        htmlParts.push(`<h1 style="font-size:1.6em;font-weight:700;margin:1.2em 0 0.4em;padding-bottom:0.3em;border-bottom:2px solid #e4e4e7;color:#18181b;">${inlineFormat(h1Match[1])}</h1>`);
+        htmlParts.push(`<h1 style="font-size:1.5em;font-weight:700;margin:1.6em 0 0.6em;padding-bottom:0.4em;border-bottom:2.5px solid #18181b;color:#18181b;letter-spacing:0.01em;text-transform:uppercase;">${inlineFormat(h1Match[1])}</h1>`);
         continue;
       }
 
-      // Heading 2: ## Subtitle
+      // Heading 2: ## BAB / Section — dengan garis atas halus sebagai pemisah
       const h2Match = trimmed.match(/^##\s+(.+)$/);
       if (h2Match && !trimmed.startsWith('###')) {
         flushParagraph();
         closeList();
-        htmlParts.push(`<h2 style="font-size:1.35em;font-weight:700;margin:1em 0 0.35em;color:#27272a;">${inlineFormat(h2Match[1])}</h2>`);
+        htmlParts.push(`<h2 style="font-size:1.25em;font-weight:700;margin:1.8em 0 0.5em;padding-top:0.8em;border-top:1px solid #d4d4d8;color:#18181b;letter-spacing:0.01em;">${inlineFormat(h2Match[1])}</h2>`);
         continue;
       }
 
-      // Heading 3: ### Sub-subtitle
+      // Heading 3: ### Sub-bab
       const h3Match = trimmed.match(/^###\s+(.+)$/);
       if (h3Match) {
         flushParagraph();
         closeList();
-        htmlParts.push(`<h3 style="font-size:1.15em;font-weight:600;margin:0.8em 0 0.3em;color:#3f3f46;">${inlineFormat(h3Match[1])}</h3>`);
+        htmlParts.push(`<h3 style="font-size:1.1em;font-weight:600;margin:1.2em 0 0.4em;color:#27272a;padding-left:0.2em;">${inlineFormat(h3Match[1])}</h3>`);
         continue;
       }
 
-      // Heading 4: #### 
+      // Heading 4: #### Sub-sub-bab
       const h4Match = trimmed.match(/^####\s+(.+)$/);
       if (h4Match) {
         flushParagraph();
         closeList();
-        htmlParts.push(`<h4 style="font-size:1.05em;font-weight:600;margin:0.6em 0 0.2em;color:#52525b;">${inlineFormat(h4Match[1])}</h4>`);
+        htmlParts.push(`<h4 style="font-size:1.02em;font-weight:600;margin:1em 0 0.3em;color:#3f3f46;padding-left:0.4em;">${inlineFormat(h4Match[1])}</h4>`);
         continue;
       }
 
-      // Horizontal rule: --- atau ***
-      if (/^[-*_]{3,}$/.test(trimmed)) {
+      // Horizontal rule: --- atau *** (tapi BUKAN cover page markers)
+      if (/^[-*_]{3,}$/.test(trimmed) && !trimmed.includes('COVER_PAGE')) {
         flushParagraph();
         closeList();
-        htmlParts.push('<hr style="border:none;border-top:1px solid #d4d4d8;margin:1.5em 0;"/>');
+        htmlParts.push('<hr style="border:none;border-top:1px solid #e4e4e7;margin:2em 1em;"/>');
         continue;
       }
 
@@ -307,7 +374,7 @@ export default function Home() {
       if (bqMatch) {
         flushParagraph();
         closeList();
-        htmlParts.push(`<blockquote style="border-left:3px solid #a1a1aa;padding-left:1em;margin:0.8em 0;color:#52525b;font-style:italic;">${inlineFormat(bqMatch[1])}</blockquote>`);
+        htmlParts.push(`<blockquote style="border-left:3.5px solid #3b82f6;padding:0.6em 1.2em;margin:1em 0;background:#f8fafc;border-radius:0 6px 6px 0;color:#374151;font-style:italic;line-height:1.8;">${inlineFormat(bqMatch[1])}</blockquote>`);
         continue;
       }
 
@@ -317,10 +384,10 @@ export default function Home() {
         flushParagraph();
         if (inOl) { htmlParts.push('</ol>'); inOl = false; }
         if (!inUl) {
-          htmlParts.push('<ul style="margin:0.5em 0;padding-left:1.8em;">');
+          htmlParts.push('<ul style="margin:0.6em 0;padding-left:2em;list-style-type:disc;">');
           inUl = true;
         }
-        htmlParts.push(`<li style="margin:0.3em 0;line-height:1.7;">${inlineFormat(ulMatch[1])}</li>`);
+        htmlParts.push(`<li style="margin:0.35em 0;line-height:1.9;color:#1a1a1a;">${inlineFormat(ulMatch[1])}</li>`);
         continue;
       }
 
@@ -330,10 +397,10 @@ export default function Home() {
         flushParagraph();
         if (inUl) { htmlParts.push('</ul>'); inUl = false; }
         if (!inOl) {
-          htmlParts.push('<ol style="margin:0.5em 0;padding-left:1.8em;">');
+          htmlParts.push('<ol style="margin:0.6em 0;padding-left:2em;list-style-type:decimal;">');
           inOl = true;
         }
-        htmlParts.push(`<li style="margin:0.3em 0;line-height:1.7;">${inlineFormat(olMatch[1])}</li>`);
+        htmlParts.push(`<li style="margin:0.35em 0;line-height:1.9;color:#1a1a1a;">${inlineFormat(olMatch[1])}</li>`);
         continue;
       }
 
@@ -347,43 +414,61 @@ export default function Home() {
     closeList();
 
     return htmlParts.join('\n');
-  }, []);
+  }, [renderCoverPageHtml]);
 
   // Helper: Memecah markdown menjadi beberapa section berdasarkan heading utama
   const splitMarkdownIntoSections = useCallback((md: string): string[] => {
-    // Split berdasarkan heading level 1 atau 2 (# atau ##)
-    // Tapi pertahankan heading-nya di setiap section
-    const lines = md.split('\n');
     const sections: string[] = [];
-    let currentSection = '';
+    let remainingMd = md;
 
-    for (const line of lines) {
-      // Deteksi heading utama (# atau ##, tapi BUKAN ###)
-      if (/^#{1,2}\s+/.test(line) && !/^###/.test(line)) {
-        // Jika sudah ada konten, simpan section sebelumnya
-        if (currentSection.trim()) {
-          sections.push(currentSection.trim());
+    // 1. Deteksi cover page block terlebih dahulu → jadikan section pertama
+    const coverStartIdx = md.indexOf('---COVER_PAGE_START---');
+    const coverEndIdx = md.indexOf('---COVER_PAGE_END---');
+
+    if (coverStartIdx !== -1 && coverEndIdx !== -1 && coverEndIdx > coverStartIdx) {
+      // Cover page menjadi section pertama (satu halaman penuh)
+      const coverSection = md.substring(coverStartIdx, coverEndIdx + '---COVER_PAGE_END---'.length);
+      sections.push(coverSection.trim());
+
+      // Sisa konten setelah cover page
+      remainingMd = md.substring(coverEndIdx + '---COVER_PAGE_END---'.length).trim();
+    }
+
+    // 2. Split sisa konten berdasarkan heading level 1 atau 2 (# atau ##)
+    if (remainingMd) {
+      const lines = remainingMd.split('\n');
+      let currentSection = '';
+
+      for (const line of lines) {
+        // Deteksi heading utama (# atau ##, tapi BUKAN ###)
+        if (/^#{1,2}\s+/.test(line) && !/^###/.test(line)) {
+          // Jika sudah ada konten, simpan section sebelumnya
+          if (currentSection.trim()) {
+            sections.push(currentSection.trim());
+          }
+          currentSection = line + '\n';
+        } else {
+          currentSection += line + '\n';
         }
-        currentSection = line + '\n';
-      } else {
-        currentSection += line + '\n';
+      }
+      // Jangan lupa section terakhir
+      if (currentSection.trim()) {
+        sections.push(currentSection.trim());
       }
     }
-    // Jangan lupa section terakhir
-    if (currentSection.trim()) {
-      sections.push(currentSection.trim());
-    }
 
-    // Jika hanya ada 1 section atau kosong, coba split berdasarkan jumlah baris
-    // agar konten panjang tetap terbagi ke beberapa halaman
-    if (sections.length <= 1 && md.length > 1500) {
-      const allLines = md.split('\n');
-      const linesPerPage = 40; // ~40 baris per halaman
+    // Jika hanya ada 1 section (tanpa cover) atau kosong, coba split berdasarkan jumlah baris
+    const nonCoverSections = sections.filter(s => !s.includes('---COVER_PAGE_START---'));
+    if (nonCoverSections.length <= 1 && remainingMd.length > 1500) {
+      // Remove non-cover sections dan re-split
+      const coverSections = sections.filter(s => s.includes('---COVER_PAGE_START---'));
+      const allLines = remainingMd.split('\n');
+      const linesPerPage = 40;
       const chunkedSections: string[] = [];
       for (let i = 0; i < allLines.length; i += linesPerPage) {
         chunkedSections.push(allLines.slice(i, i + linesPerPage).join('\n'));
       }
-      return chunkedSections;
+      return [...coverSections, ...chunkedSections];
     }
 
     return sections;

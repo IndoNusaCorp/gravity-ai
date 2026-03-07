@@ -22,108 +22,169 @@ function generateArtikelPrompt(topic: string) {
 function generatePaperPrompt(topic: string, docType: string) {
     const templates: Record<string, string> = {
         research: `Buatkan dokumen riset lengkap dan mendalam mengenai topik: "${topic}".
-Gunakan format penulisan akademis yang baku dan terstruktur:
+        Gunakan format penulisan akademis yang baku dan terstruktur.
 
-1. **Judul Penelitian**
-Gunakan format markdown yang terstruktur sebagai berikut:
+        BAGIAN PERTAMA yang WAJIB kamu tulis adalah HALAMAN SAMPUL (cover page) dengan format PERSIS seperti ini:
 
-# Judul Penelitian
-## Abstrak
-(ringkasan singkat 150-250 kata)
+        ---COVER_PAGE_START---
+        TITLE: [Judul Penelitian yang Relevan tentang ${topic}]
+        DOCTYPE: PENELITIAN
+        DESCRIPTION: Disusun untuk memenuhi tugas penelitian ilmiah
+        AUTHOR: [Nama Peneliti]
+        NIM: [NIM Peneliti]
+        DEPARTMENT: [Program Studi]
+        FACULTY: [Fakultas]
+        UNIVERSITY: [Nama Universitas]
+        YEAR: [Tahun]
+        ---COVER_PAGE_END---
 
-## Kata Kunci
-(5-7 kata kunci yang relevan)
+        Setelah halaman sampul, lanjutkan dengan isi dokumen menggunakan heading markdown:
 
-## BAB I - Pendahuluan
-### 1.1 Latar Belakang
-### 1.2 Rumusan Masalah
-### 1.3 Tujuan Penelitian
-### 1.4 Manfaat Penelitian
+        ## Abstrak
+        (ringkasan singkat 150-250 kata)
 
-## BAB II - Tinjauan Pustaka
-### 2.1 Landasan Teori
-### 2.2 Penelitian Terdahulu
+        ## Kata Kunci
+        (5-7 kata kunci yang relevan)
 
-## BAB III - Metode Penelitian
-### 3.1 Pendekatan Penelitian
-### 3.2 Teknik Pengumpulan Data
-### 3.3 Analisis Data
+        ## BAB I - Pendahuluan
+        ### 1.1 Latar Belakang
+        ### 1.2 Rumusan Masalah
+        ### 1.3 Tujuan Penelitian
+        ### 1.4 Manfaat Penelitian
 
-## BAB IV - Hasil dan Pembahasan
+        ## BAB II - Tinjauan Pustaka
+        ### 2.1 Landasan Teori
+        ### 2.2 Penelitian Terdahulu
 
-## BAB V - Kesimpulan dan Saran
+        ## BAB III - Metode Penelitian
+        ### 3.1 Pendekatan Penelitian
+        ### 3.2 Teknik Pengumpulan Data
+        ### 3.3 Analisis Data
 
-## Daftar Pustaka
-(format APA)
+        ## BAB IV - Hasil dan Pembahasan
 
-PENTING: Gunakan heading markdown (#, ##, ###) untuk setiap judul dan sub-judul. Tulis paragraf dengan lengkap dan mendalam. Gunakan bullet list (-) untuk daftar item. Tulis dengan bahasa baku, formal, dan akademis.`,
+        ## BAB V - Kesimpulan dan Saran
+
+        ## Daftar Pustaka
+        (format APA)
+
+        PENTING:
+        - WAJIB mulai dengan blok ---COVER_PAGE_START--- dan ---COVER_PAGE_END--- persis seperti format di atas.
+        - Isi field dalam kurung siku [...] dengan data placeholder yang relevan.
+        - Gunakan heading markdown (#, ##, ###) untuk setiap judul dan sub-judul setelah cover page.
+        - WAJIB tulis SEMUA BAB secara LENGKAP dari BAB I sampai BAB V tanpa ada yang dilewati.
+        - Setiap sub-bab (1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 3.1, 3.2, 3.3, dst.) HARUS ditulis dengan paragraf panjang minimal 3-5 kalimat per sub-bab.
+        - JANGAN berhenti di tengah-tengah. Dokumen HARUS selesai sampai Daftar Pustaka.
+        - Tulis paragraf dengan lengkap dan mendalam. Gunakan bullet list (-) untuk daftar item. Tulis dengan bahasa baku, formal, dan akademis.`,
 
         skripsi: `Buatkan draf skripsi lengkap tentang topik: "${topic}".
-Gunakan format markdown yang terstruktur sebagai berikut:
+        Gunakan format penulisan akademis yang baku dan terstruktur.
 
-# Skripsi: [Judul tentang ${topic}]
+        BAGIAN PERTAMA yang WAJIB kamu tulis adalah HALAMAN SAMPUL (cover page) dengan format PERSIS seperti ini:
 
-## Abstrak
-(Bahasa Indonesia, 200-300 kata)
+        ---COVER_PAGE_START---
+        TITLE: [Judul Skripsi yang Relevan tentang ${topic}]
+        DOCTYPE: SKRIPSI
+        DESCRIPTION: Diajukan untuk memenuhi salah satu syarat memperoleh gelar Sarjana
+        AUTHOR: [Nama Mahasiswa]
+        NIM: [NIM Mahasiswa]
+        DEPARTMENT: [Program Studi]
+        FACULTY: [Fakultas]
+        UNIVERSITY: [Nama Universitas]
+        YEAR: [Tahun]
+        ---COVER_PAGE_END---
 
-## BAB I - PENDAHULUAN
-### 1.1 Latar Belakang Masalah
-### 1.2 Identifikasi Masalah
-### 1.3 Rumusan Masalah
-### 1.4 Tujuan Penelitian
-### 1.5 Manfaat Penelitian
+        Setelah halaman sampul, lanjutkan dengan isi dokumen menggunakan heading markdown:
 
-## BAB II - TINJAUAN PUSTAKA
-### 2.1 Landasan Teori
-### 2.2 Kerangka Berpikir
-### 2.3 Hipotesis
+        ## Abstrak
+        (Bahasa Indonesia, 200-300 kata)
 
-## BAB III - METODOLOGI PENELITIAN
-### 3.1 Waktu dan Tempat Penelitian
-### 3.2 Metode Penelitian
-### 3.3 Populasi dan Sampel
-### 3.4 Instrumen Penelitian
-### 3.5 Teknik Analisis Data
+        ## BAB I - PENDAHULUAN
+        ### 1.1 Latar Belakang Masalah
+        ### 1.2 Identifikasi Masalah
+        ### 1.3 Rumusan Masalah
+        ### 1.4 Tujuan Penelitian
+        ### 1.5 Manfaat Penelitian
 
-## Daftar Pustaka
-(format APA)
+        ## BAB II - TINJAUAN PUSTAKA
+        ### 2.1 Landasan Teori
+        ### 2.2 Kerangka Berpikir
+        ### 2.3 Hipotesis
 
-PENTING: Gunakan heading markdown (#, ##, ###) untuk setiap judul dan sub-judul. Tulis setiap bagian dengan lengkap, mendalam, formal, dan akademis. Gunakan paragraf yang panjang dan mendetail. Gunakan bullet list (-) untuk daftar item.`,
+        ## BAB III - METODOLOGI PENELITIAN
+        ### 3.1 Waktu dan Tempat Penelitian
+        ### 3.2 Metode Penelitian
+        ### 3.3 Populasi dan Sampel
+        ### 3.4 Instrumen Penelitian
+        ### 3.5 Teknik Analisis Data
+
+        ## Daftar Pustaka
+        (format APA)
+
+        PENTING:
+        - WAJIB mulai dengan blok ---COVER_PAGE_START--- dan ---COVER_PAGE_END--- persis seperti format di atas.
+        - Isi field dalam kurung siku [...] dengan data placeholder yang relevan.
+        - Gunakan heading markdown (#, ##, ###) untuk setiap judul dan sub-judul setelah cover page.
+        - WAJIB tulis SEMUA BAB secara LENGKAP dari BAB I Pendahuluan (1.1 sampai 1.5), BAB II Tinjauan Pustaka (2.1 sampai 2.3), BAB III Metodologi (3.1 sampai 3.5), sampai Daftar Pustaka.
+        - Setiap sub-bab HARUS ditulis dengan paragraf panjang minimal 3-5 kalimat per sub-bab. JANGAN hanya menulis judul sub-bab tanpa isi.
+        - JANGAN berhenti di tengah-tengah. Dokumen HARUS selesai sampai Daftar Pustaka.
+        - Tulis setiap bagian dengan lengkap, mendalam, formal, dan akademis. Gunakan paragraf yang panjang dan mendetail. Gunakan bullet list (-) untuk daftar item.`,
 
         artikel: `Buatkan draf artikel ilmiah (journal paper) lengkap tentang topik: "${topic}".
-Gunakan format markdown yang terstruktur sebagai berikut:
+        Gunakan format penulisan akademis yang baku dan terstruktur.
 
-# [Judul Artikel yang Singkat, Jelas, dan Informatif]
+        BAGIAN PERTAMA yang WAJIB kamu tulis adalah HALAMAN SAMPUL (cover page) dengan format PERSIS seperti ini:
 
-## Abstrak
-(150-250 kata, mencakup tujuan, metode, hasil, kesimpulan)
+        ---COVER_PAGE_START---
+        TITLE: [Judul Artikel Ilmiah yang Singkat, Jelas, dan Informatif tentang ${topic}]
+        DOCTYPE: ARTIKEL ILMIAH
+        DESCRIPTION: Disusun untuk memenuhi tugas penulisan artikel ilmiah
+        AUTHOR: [Nama Penulis]
+        NIM: [NIM Penulis]
+        DEPARTMENT: [Program Studi]
+        FACULTY: [Fakultas]
+        UNIVERSITY: [Nama Universitas]
+        YEAR: [Tahun]
+        ---COVER_PAGE_END---
 
-## Keywords
-(5-7 kata kunci)
+        Setelah halaman sampul, lanjutkan dengan isi dokumen menggunakan heading markdown:
 
-## 1. Pendahuluan
-(latar belakang, gap penelitian, tujuan)
+        ## Abstrak
+        (150-250 kata, mencakup tujuan, metode, hasil, kesimpulan)
 
-## 2. Tinjauan Literatur
-### 2.1 Kajian Teori
-### 2.2 Penelitian Terdahulu
+        ## Keywords
+        (5-7 kata kunci)
 
-## 3. Metodologi
-### 3.1 Desain Penelitian
-### 3.2 Data dan Sumber Data
-### 3.3 Teknik Analisis
+        ## 1. Pendahuluan
+        (latar belakang, gap penelitian, tujuan)
 
-## 4. Hasil dan Pembahasan
-### 4.1 Temuan Penelitian
-### 4.2 Analisis dan Interpretasi
+        ## 2. Tinjauan Literatur
+        ### 2.1 Kajian Teori
+        ### 2.2 Penelitian Terdahulu
 
-## 5. Kesimpulan
-(ringkasan, implikasi, saran untuk penelitian selanjutnya)
+        ## 3. Metodologi
+        ### 3.1 Desain Penelitian
+        ### 3.2 Data dan Sumber Data
+        ### 3.3 Teknik Analisis
 
-## Daftar Pustaka
-(format APA atau IEEE)
+        ## 4. Hasil dan Pembahasan
+        ### 4.1 Temuan Penelitian
+        ### 4.2 Analisis dan Interpretasi
 
-PENTING: Gunakan heading markdown (#, ##, ###) untuk setiap judul dan sub-judul. Tulis dengan gaya penulisan akademis yang ketat. Gunakan bahasa formal dan ilmiah. Tulis paragraf yang lengkap dan mendalam. Gunakan bullet list (-) untuk daftar item.`
+        ## 5. Kesimpulan
+        (ringkasan, implikasi, saran untuk penelitian selanjutnya)
+
+        ## Daftar Pustaka
+        (format APA atau IEEE)
+
+        PENTING:
+        - WAJIB mulai dengan blok ---COVER_PAGE_START--- dan ---COVER_PAGE_END--- persis seperti format di atas.
+        - Isi field dalam kurung siku [...] dengan data placeholder yang relevan.
+        - Gunakan heading markdown (#, ##, ###) untuk setiap judul dan sub-judul setelah cover page.
+        - WAJIB tulis SEMUA bagian secara LENGKAP dari Abstrak, Pendahuluan, Tinjauan Literatur (2.1, 2.2), Metodologi (3.1, 3.2, 3.3), Hasil dan Pembahasan (4.1, 4.2), Kesimpulan, sampai Daftar Pustaka.
+        - Setiap sub-bab HARUS ditulis dengan paragraf panjang minimal 3-5 kalimat per sub-bab. JANGAN hanya menulis judul sub-bab tanpa isi.
+        - JANGAN berhenti di tengah-tengah. Dokumen HARUS selesai sampai Daftar Pustaka.
+        - Tulis dengan gaya penulisan akademis yang ketat. Gunakan bahasa formal dan ilmiah. Tulis paragraf yang lengkap dan mendalam. Gunakan bullet list (-) untuk daftar item.`
     };
     return templates[docType] || templates.research;
 }
@@ -213,10 +274,14 @@ export async function POST(req: NextRequest) {
         Kamu menanyakan untuk di buatkan research, skripsi, atau artikel ilmiah lagi atau tidak, KECUALI saat sedang mengeksekusi fitur tambahan spesifik.
         Selalu ingat percakapan sebelumnya dan pastikan percakapan tetap relevan dan nyambung dengan konteks yang diberikan pada ===== RIWAYAT PERCAKAPAN SEBELUMNYA =====.
         ${isPaperMode ? `
-PENTING: Kamu sedang dalam MODE PAPER. Kamu HARUS langsung menulis dokumen tanpa kalimat pembuka atau basa-basi apapun.
-JANGAN tulis kalimat seperti "Tentu, ini draf..." atau "Berikut adalah..." atau "Ini dia...". 
-LANGSUNG mulai dari judul dokumen (heading markdown #) tanpa kata pengantar apapun.
-JANGAN tambahkan komentar atau catatan penutup setelah dokumen selesai.
+        PENTING: Kamu sedang dalam MODE PAPER. Kamu HARUS langsung menulis dokumen tanpa kalimat pembuka atau basa-basi apapun.
+        JANGAN tulis kalimat seperti "Tentu, ini draf..." atau "Berikut adalah..." atau "Ini dia...". 
+        LANGSUNG mulai dari blok ---COVER_PAGE_START--- tanpa kata pengantar apapun.
+        JANGAN tambahkan komentar atau catatan penutup setelah dokumen selesai.
+        KRITIS: Kamu WAJIB menulis dokumen secara LENGKAP dari awal hingga akhir. JANGAN pernah berhenti di tengah jalan.
+        Tulis SETIAP BAB dan SETIAP SUB-BAB dengan isi paragraf yang lengkap dan mendetail (minimal 3-5 kalimat per sub-bab).
+        Jika ada BAB I, BAB II, BAB III, BAB IV, BAB V — SEMUA harus ditulis lengkap sampai Daftar Pustaka.
+        Kamu TIDAK BOLEH melewatkan atau mengosongkan sub-bab manapun.
 ` : ''}
         ${historyContext}
         ${brainContext}
@@ -225,7 +290,7 @@ JANGAN tambahkan komentar atau catatan penutup setelah dokumen selesai.
         const response = await libra.chat(finalPrompt, {
             systemPrompt: customInstruction,
             temperature: 0.7,
-            maxTokens: isPaperMode ? 4096 : 2048,
+            maxTokens: isPaperMode ? 16384 : 2048,
             keeptalking: true,
             rememberPreviousConversation: true
         } as LibraChatOptions & { keeptalking?: boolean, rememberPreviousConversation?: boolean });
