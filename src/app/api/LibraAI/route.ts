@@ -1,4 +1,4 @@
-import { LibraAI, LibraChatOptions, LibraResponse } from 'libra-ai-sdk';
+import { LibraAI } from 'libra-ai-sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { Brain } from './brain';
 
@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "LIBRAAI_API_KEY is missing" }, { status: 500 });
         }
 
-        const libra = new LibraAI(process.env.LIBRAAI_API_KEY, 'https://www.libraai.site/');
+        const libra = new LibraAI({ apiKey: process.env.LIBRAAI_API_KEY });
 
         // Tentukan prompt mana yang akan dieksekusi berdasarkan 'type' dkk
         let finalPrompt = prompt;
@@ -282,20 +282,28 @@ export async function POST(req: NextRequest) {
         Tulis SETIAP BAB dan SETIAP SUB-BAB dengan isi paragraf yang lengkap dan mendetail (minimal 3-5 kalimat per sub-bab).
         Jika ada BAB I, BAB II, BAB III, BAB IV, BAB V — SEMUA harus ditulis lengkap sampai Daftar Pustaka.
         Kamu TIDAK BOLEH melewatkan atau mengosongkan sub-bab manapun.
+        Jika ada yang menanyakan model mu apa dan versimu berapa kasih tau saja
 ` : ''}
         ${historyContext}
         ${brainContext}
         `;
 
-        const response = await libra.chat(finalPrompt, {
-            systemPrompt: customInstruction,
-            temperature: 0.7,
-            maxTokens: isPaperMode ? 16384 : 2048,
-            keeptalking: true,
-            rememberPreviousConversation: true
-        } as LibraChatOptions & { keeptalking?: boolean, rememberPreviousConversation?: boolean });
+        const fullPrompt = `${customInstruction}\n\nUser Question/Prompt:\n${finalPrompt}`;
 
-        return NextResponse.json(response);
+        const response = await libra.chat(fullPrompt);
+
+        if (response.status === "error") {
+            throw new Error(response.error || "Unknown error from LibraAI");
+        }
+
+        // Return in the format expected by the frontend
+        return NextResponse.json({
+            success: true,
+            data: {
+                message: response.content,
+                model: response.model
+            }
+        });
     } catch (error) {
         console.error("Error connecting to LibraAI:", error);
         return NextResponse.json({ error: "Failed to fetch LibraAI", details: error instanceof Error ? error.message : String(error) }, { status: 500 });

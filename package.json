@@ -10,7 +10,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
     "framer-motion": "^12.34.3",
-    "libra-ai-sdk": "^2.0.1",
+    "libra-ai-sdk": "^2.0.3",
     "lucide-react": "^0.575.0",
     "markdown-to-jsx": "^9.7.6",
     "next": "16.1.6",
