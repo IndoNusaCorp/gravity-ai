@@ -1,6 +1,7 @@
 import { LibraAI } from 'libra-ai-sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { Brain } from './brain';
+import { GoogleGenAI } from '@google/genai';
 
 // Fungsi helper untuk merakit prompt khusus sesuai kebutuhan
 // 1. generate research
@@ -194,12 +195,18 @@ export async function POST(req: NextRequest) {
         // Tambahkan parameter 'type' atau 'action' dari frontend jika ada
         const { prompt, type, history } = await req.json();
 
-        if (!process.env.LIBRAAI_API_KEY) {
-            console.error("API Key for LibraAI is missing. Please check your .env file.");
-            return NextResponse.json({ error: "LIBRAAI_API_KEY is missing" }, { status: 500 });
-        }
+        // Kumpulkan semua API key yang tersedia dari .env sebagai sistem routing API
+        const apiKeys = [
+            process.env.LIBRAAI_API_KEY,
+            process.env.LIBRAAI_BACKUP_1,
+            process.env.LIBRAAI_BACKUP_2,
+            process.env.LIBRAAI_BACKUP_3
+        ].filter(Boolean) as string[];
 
-        const libra = new LibraAI({ apiKey: process.env.LIBRAAI_API_KEY });
+        if (apiKeys.length === 0) {
+            console.error("Semua API Key untuk LibraAI tidak ditemukan. Silakan periksa file .env.");
+            return NextResponse.json({ error: "Semua LIBRAAI API Keys missing" }, { status: 500 });
+        }
 
         // Tentukan prompt mana yang akan dieksekusi berdasarkan 'type' dkk
         let finalPrompt = prompt;
@@ -291,10 +298,49 @@ export async function POST(req: NextRequest) {
 
         const fullPrompt = `${customInstruction}\n\nUser Question/Prompt:\n${finalPrompt}`;
 
-        const response = await libra.chat(fullPrompt);
+        let response: any = null;
+        let lastError: any = null;
 
-        if (response.status === "error") {
-            throw new Error(response.error || "Unknown error from LibraAI");
+        // Loop melalui semua API key yang tersedia, gunakan LibraAI untuk primary dan Gemini untuk cadangan
+        for (const [index, apiKey] of apiKeys.entries()) {
+            try {
+                // Index 0 di asumsi sebagai LibraAI API Key, sisanya adalah Google Gemini Backup Key
+                if (index === 0) {
+                    const libra = new LibraAI({ apiKey });
+                    const currentResponse = await libra.chat(fullPrompt);
+                    
+                    if (currentResponse.status === "error") {
+                        throw new Error(currentResponse.error || "Unknown error from LibraAI");
+                    }
+                    
+                    response = currentResponse;
+                } else {
+                    const ai = new GoogleGenAI({ apiKey });
+                    const currentResponse = await ai.models.generateContent({
+                        model: 'gemini-3-flash-preview',
+                        contents: fullPrompt,
+                    });
+
+                    if (!currentResponse.text) {
+                        throw new Error("Empty response from Gemini");
+                    }
+
+                    response = {
+                        content: currentResponse.text,
+                        model: 'gemini-2.5-flash' // Sebagai penanda kita sedang menggunakan model cadangan
+                    };
+                }
+                
+                break; // Berhasil mendapatkan response, keluar dari loop
+            } catch (error) {
+                console.warn(`Gagal memanggil API (Key index ${index}), mencoba API cadangan selanjutnya... Error:`, error instanceof Error ? error.message : String(error));
+                lastError = error;
+            }
+        }
+
+        // Jika semua API key gagal
+        if (!response) {
+            throw new Error(lastError instanceof Error ? lastError.message : "Semua API cadangan gagal merespon.");
         }
 
         // Return in the format expected by the frontend
