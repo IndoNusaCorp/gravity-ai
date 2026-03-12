@@ -353,6 +353,22 @@ export async function POST(req: NextRequest) {
         });
     } catch (error) {
         console.error("Error connecting to LibraAI:", error);
-        return NextResponse.json({ error: "Failed to fetch LibraAI", details: error instanceof Error ? error.message : String(error) }, { status: 500 });
+
+        let errorMessage = "Failed to fetch LibraAI";
+        let errorDetails = error instanceof Error ? error.message : String(error);
+
+        // Cek apakah ada indikasi limit API (429, RESOURCE_EXHAUSTED, atau quota exceeded)
+        const errorString = typeof error === 'object' ? JSON.stringify(error, Object.getOwnPropertyNames(error)) : String(errorDetails);
+        if (
+            errorString.includes("429") || 
+            errorString.includes("RESOURCE_EXHAUSTED") || 
+            errorString.includes("Quota") ||
+            errorString.includes("quota")
+        ) {
+            errorMessage = "LibraAI sedang error, Tolong tunggu beberapa saat";
+            errorDetails = errorMessage;
+        }
+
+        return NextResponse.json({ error: errorMessage, details: errorDetails }, { status: 500 });
     }
 }
