@@ -2,6 +2,7 @@ import { LibraAI } from 'libra-ai-sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import { Brain } from './brain';
 import { GoogleGenAI } from '@google/genai';
+import { dataset, readPdfContent } from '../../dataset/dataset';
 
 // Fungsi helper untuk merakit prompt khusus sesuai kebutuhan
 // 1. generate research
@@ -269,6 +270,33 @@ export async function POST(req: NextRequest) {
             console.error("Gagal mengeksekusi fungsi Brain:", err);
         }
 
+        // Baca isi dari file PDF dataset
+        let datasetContext = "";
+        try {
+            console.log("Loading PDF dataset contents...");
+            const pdfContents = await Promise.all(
+                dataset.map(async (fileName: string) => {
+                    try {
+                        const content = await readPdfContent(fileName);
+                        return `--- DATASET: ${fileName} ---\n${content}\n--------------------------\n`;
+                    } catch (err) {
+                        console.warn(`Gagal membaca PDF ${fileName}:`, err);
+                        return "";
+                    }
+                })
+            );
+            
+            // membatasi panjang context misal max 15000 karakter agar tidak menabrak limit token saat mengirim ke API
+            const combinedPdfText = pdfContents.join("\n");
+            datasetContext = `
+        Berikut adalah isi dari dokumen PDF di dalam Dataset lokal yang WAJIB kamu jadikan referensi utama pengetahuanmu:
+        ${combinedPdfText.substring(0, 15000)} ... (terpotong karena limit)
+            `;
+            console.log("PDF dataset contents loaded successfully.");
+        } catch(err) {
+            console.error("Gagal membaca file dataset:", err);
+        }
+
         // Setup custom instruction (system prompt) agar LibraAI tahu perannya
         const customInstruction = `
         Kamu adalah LibraAI v2.3 Ultra.
@@ -293,6 +321,7 @@ export async function POST(req: NextRequest) {
         Jika ada yang menanyakan model mu apa dan versimu berapa kasih tau saja
 ` : ''}
         ${historyContext}
+        ${datasetContext}
         ${brainContext}
         `;
 

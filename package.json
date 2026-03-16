@@ -10,12 +10,14 @@
   "dependencies": {
     "@google/genai": "^1.44.0",
     "@supabase/supabase-js": "^2.98.0",
+    "canvas": "^3.2.1",
     "framer-motion": "^12.34.3",
     "libra-ai-sdk": "^2.0.3",
     "lucide-react": "^0.575.0",
     "markdown-to-jsx": "^9.7.6",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
+    "pdf2json": "^4.0.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "transformers": "^3.1.0"
