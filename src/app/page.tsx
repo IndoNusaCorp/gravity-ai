@@ -39,10 +39,12 @@ export default function Home() {
   // State untuk halaman yang sedang dipilih (untuk delete)
   const [selectedPage, setSelectedPage] = useState(0);
 
+  //efek tombol add paper
   const handleAddPaper = () => {
     setPageNumber((prev) => prev + 1);
   };
 
+  //efek tombol delete paper
   const handleDeletePaper = () => {
     if (pageNumber <= 1) return;
 

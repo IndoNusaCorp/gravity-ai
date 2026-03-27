@@ -12,6 +12,7 @@
     "@supabase/supabase-js": "^2.98.0",
     "canvas": "^3.2.1",
     "framer-motion": "^12.34.3",
+    "html2pdf.js": "^0.14.0",
     "libra-ai-sdk": "^2.0.3",
     "lucide-react": "^0.575.0",
     "markdown-to-jsx": "^9.7.6",

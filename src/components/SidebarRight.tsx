@@ -18,6 +18,9 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [authModalType, setAuthModalType] = useState<AuthType>("login");
 
+    //state untuk fitur download
+    const [isDownload, setIsDownload] = useState(true);
+
     //State untuk koneksikan Authentication ke SidebarRight
     const [username, getusername] = useState<string | null>(null);
     const [email, getemail] = useState<string | null>(null);
@@ -64,6 +67,138 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
         { value: "quarto", label: "Quarto", width: "768px" },
         { value: "ledger", label: "Ledger", width: "1632px" },
     ];
+
+    const downloadPaper = async (type: "pdf" | "docx") => {
+        // 1. Cek izin download
+        if (!isDownload) {
+            console.warn("Download belum diizinkan.");
+            return;
+        }
+
+        // Kumpulkan semua elemen kertas (mulai dari index 0 sampai tidak ada)
+        const pages: HTMLElement[] = [];
+        let index = 0;
+        let p = document.getElementById(`main-editor-${index}`);
+        while (p) {
+            pages.push(p);
+            index++;
+            p = document.getElementById(`main-editor-${index}`);
+        }
+
+        if (pages.length === 0) {
+            alert("Tidak ada kertas untuk di-download.");
+            return;
+        }
+
+        const timestamp = new Date().toISOString().slice(0, 10);
+        const selectedFileName = `GravityAI_Document_${timestamp}`;
+
+        if (type === "pdf") {
+            try {
+                // Gunakan dynamic import agar library ini hanya diload di sisi client
+                // @ts-ignore
+                const html2pdfModule = await import("html2pdf.js");
+                const html2pdf = (html2pdfModule.default ? html2pdfModule.default : html2pdfModule) as any;
+
+                // Buat container virtual untuk print
+                const printContainer = document.createElement("div");
+                // Harus di-append ke body agar html2canvas bisa mengkalkulasi style (seperti tinggi/lebar)
+                printContainer.style.position = "absolute";
+                printContainer.style.top = "-9999px";
+                printContainer.style.left = "-9999px";
+                printContainer.style.background = "white";
+                printContainer.style.color = "black";
+                document.body.appendChild(printContainer);
+
+                // Fungsi bantuan untuk menghapus efek dark mode pada hasil print PDF
+                const stripDarkClasses = (el: HTMLElement) => {
+                    const classesToRemove = Array.from(el.classList).filter(c => c.startsWith('dark:'));
+                    if (classesToRemove.length > 0) {
+                        el.classList.remove(...classesToRemove);
+                    }
+                    // Jika elemen ini punya warna text spesifik putih, timpa dengan hitam
+                    const computedColor = window.getComputedStyle(el).color;
+                    if (computedColor === 'rgb(255, 255, 255)' || computedColor === '#ffffff' || el.classList.contains('text-white')) {
+                        el.style.setProperty('color', '#18181b', 'important'); // Paksakan teks gelap
+                    }
+
+                    Array.from(el.children).forEach(child => {
+                        stripDarkClasses(child as HTMLElement);
+                    });
+                };
+
+                pages.forEach((pageDom, i) => {
+                    // Clone sehingga kita tidak merusak DOM asli
+                    const clone = pageDom.cloneNode(true) as HTMLElement;
+                    
+                    // Buang dark mode classes pada clone
+                    stripDarkClasses(clone);
+                    
+                    // Reset styling agar pas dengan cetakan PDF
+                    clone.style.width = "794px"; // Lebar kertas A4 statis agar margin konsisten
+                    clone.style.minHeight = "auto";
+                    clone.style.margin = "0";
+                    clone.style.boxShadow = "none";
+                    clone.style.border = "none";
+                    clone.style.padding = "40px"; // Simulasi margin kertas
+                    clone.style.background = "white"; // Paksa kertas putih
+
+                    printContainer.appendChild(clone);
+
+                    // Beri break per halaman kecuali halaman terakhir
+                    if (i < pages.length - 1) {
+                        const pageBreak = document.createElement("div");
+                        pageBreak.className = "html2pdf__page-break";
+                        printContainer.appendChild(pageBreak);
+                    }
+                });
+
+                const opt = {
+                    margin: 0,
+                    filename: `${selectedFileName}.pdf`,
+                    image: { type: "jpeg", quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, letterRendering: true, windowWidth: 1024 },
+                    jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+                };
+
+                await html2pdf().set(opt).from(printContainer).save();
+                
+                // Cleanup container setelah selesai
+                document.body.removeChild(printContainer);
+                
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                alert("Gagal membuat PDF. Pastikan module html2pdf.js beroperasi dengan baik.");
+            }
+        } else if (type === "docx") {
+            // Trik DOCX: bungkus seluruh innerHTML dalam kerangka Microsoft Word
+            let htmlContent = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head><meta charset='utf-8'><title>GravityAI Export</title></head><body>
+            `;
+
+            pages.forEach((pageDom) => {
+                htmlContent += pageDom.innerHTML;
+                htmlContent += "<br clear=all style='mso-special-character:line-break;page-break-before:always'>";
+            });
+            htmlContent += "</body></html>";
+
+            // Buat Blob dengan format ms-word
+            const blob = new Blob(['\ufeff', htmlContent], {
+                type: "application/msword",
+            });
+
+            // Eksekusi download file
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${selectedFileName}.doc`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+    };
 
     // Effect ini berjalan jika pengguna mengganti warna atau jenis kertas.
     // Ia akan mengatur "CSS variables" (lebar kertas & warnanya) di HTML.
@@ -255,6 +390,31 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                                 className="py-2.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
                             >
                                 Upload Image
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Download File Section */}
+                    <div className="space-y-3">
+                        <label className="text-xs uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                            <Image className="w-3.5 h-3.5 opacity-70" />
+                            Manajemen File
+                        </label>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => downloadPaper("docx")}
+                                disabled={!isDownload} // Tombol otomatis tidak bisa diklik jika isDownload false
+                                className={`
+                py-2.5 px-3 rounded-lg border text-sm font-medium transition-all duration-200
+                flex items-center justify-center gap-2
+                ${isDownload
+                                        ? "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 active:scale-95"
+                                        : "border-transparent bg-zinc-100 dark:bg-zinc-800/50 text-zinc-400 cursor-pointer"}
+            `}
+                            >
+                                <Image className="w-4 h-4" />
+                                Download DOCX
                             </button>
                         </div>
                     </div>
