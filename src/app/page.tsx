@@ -6,6 +6,7 @@ import { SidebarRight } from "@/components/SidebarRight";
 import { Search, Send, X, Plus, Minus, FileText, BookOpen, GraduationCap, Newspaper, Check, PenTool, Link as LinkIcon, Upload, Edit3, Calculator, AlignLeft, MessageSquare, Table, Network, MoreHorizontal } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import Markdown from "markdown-to-jsx";
+import { Analytics } from "@vercel/analytics/next"
 
 export default function Home() {
   // State untuk melacak apakah input sedang fokus (diklik)
@@ -760,6 +761,7 @@ export default function Home() {
   return (
     <>
       <div className="relative flex flex-col items-center min-h-screen bg-zinc-50 dark:bg-zinc-950 font-sans overflow-x-hidden py-12 transition-colors duration-300">
+        <Analytics />
         {/* Sidebars */}
         <SidebarLeft />
         <SidebarRight onImageUpload={handleImageUpload} />
