@@ -118,16 +118,16 @@ export function SidebarLeft() {
 
   return (
     <motion.div
-      initial={{ x: -300, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 100, damping: 20 }}
-      className="fixed left-0 top-0 h-full w-72 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-r border-zinc-200 dark:border-zinc-800 p-6 z-40 hidden md:block pt-20"
+      className="fixed left-0 top-0 w-full h-16 bg-[#D9E4D1] dark:bg-[#0D0606] border-b border-[#0D0606]/20 dark:border-[#D9E4D1]/20 px-4 z-40 hidden md:flex items-center shadow-md"
     >
-      <div className="space-y-8">
+      <div className="flex items-center gap-6 overflow-x-auto w-full scrollbar-hide h-full py-2">
         {/* Font Family Selection */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Typography</label>
-          <div className="grid grid-cols-1 gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs font-bold text-[#0D0606] dark:text-[#D9E4D1] mr-1">FONT</label>
+          <div className="flex items-center gap-1 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 p-1 rounded-lg">
             {["Inter", "Times New Roman", "Geist", "Georgia", "Arial", "Courier New"].map((font) => (
               <button
                 key={font}
@@ -138,9 +138,9 @@ export function SidebarLeft() {
                   if (editor && document.activeElement !== editor) editor.focus();
                   document.execCommand("fontName", false, font === "Times New Roman" ? "Times New Roman, serif" : font);
                 }}
-                className={`py-2 px-3 rounded-lg text-left text-sm transition-all duration-200 ${fontFamily === font
-                  ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium"
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                className={`px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${fontFamily === font
+                  ? "bg-[#0D0606] text-[#D9E4D1] dark:bg-[#D9E4D1] dark:text-[#0D0606] font-bold shadow-sm"
+                  : "text-[#0D0606] dark:text-[#D9E4D1] hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10"
                   }`}
                 style={{ fontFamily: font === "Times New Roman" ? "serif" : "inherit" }}
               >
@@ -150,30 +150,28 @@ export function SidebarLeft() {
           </div>
         </div>
 
+        <div className="w-px h-8 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 shrink-0"></div>
+
         {/* Font Size Slider */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Font Size</label>
-            <span className="text-xs text-zinc-400">{fontSize}px</span>
-          </div>
+        <div className="flex items-center gap-3 shrink-0 w-36">
+          <label className="text-xs font-bold text-[#0D0606] dark:text-[#D9E4D1] w-14">SIZE: {fontSize}</label>
           <input
             type="range"
             min="12"
             max="48"
             value={fontSize}
             onChange={(e) => setFontSize(Number(e.target.value))}
-            className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-zinc-900 dark:accent-white"
+            className="w-full h-1.5 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 rounded-lg appearance-none cursor-pointer accent-[#0D0606] dark:accent-[#D9E4D1]"
           />
         </div>
 
-        {/* Font Thickness moved from Right Sidebar */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-              <Type className="w-3.5 h-3.5" /> Weight
-            </label>
-            <span className="text-xs text-zinc-400">{fontWeight}</span>
-          </div>
+        <div className="w-px h-8 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 shrink-0"></div>
+
+        {/* Font Thickness */}
+        <div className="flex items-center gap-3 shrink-0 w-36">
+          <label className="text-xs font-bold text-[#0D0606] dark:text-[#D9E4D1] flex items-center gap-1 w-14">
+            <Type className="w-3.5 h-3.5" /> {fontWeight}
+          </label>
           <input
             type="range"
             min="100"
@@ -181,53 +179,44 @@ export function SidebarLeft() {
             step="100"
             value={fontWeight}
             onChange={(e) => setFontWeight(Number(e.target.value))}
-            className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer dark:bg-zinc-700 accent-zinc-900 dark:accent-white"
+            className="w-full h-1.5 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 rounded-lg appearance-none cursor-pointer accent-[#0D0606] dark:accent-[#D9E4D1]"
           />
-          <div className="flex justify-between px-1">
-            <span className="text-[10px] text-zinc-400">Thin</span>
-            <span className="text-[10px] text-zinc-400 font-bold">Bold</span>
-          </div>
         </div>
 
-        {/* Font color*/}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-              <Palette className="w-3.5 h-3.5" /> Color
-            </label>
-            <span className="text-xs text-zinc-400 uppercase font-mono">{fontColor}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="grid grid-cols-5 gap-2 flex-1">
-              {["#000000", "#52525b", "#ef4444", "#3b82f6", "#10b981"].map((color) => (
-                <button
-                  key={color}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    // Simpan rentang kursor (selection) sebelum kehilangan fokus ke tombol
-                    const selection = window.getSelection();
-                    if (!selection || selection.rangeCount === 0) return;
+        <div className="w-px h-8 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 shrink-0"></div>
 
-                    const editor = document.getElementById("main-editor");
-                    if (editor && !editor.contains(selection.anchorNode)) {
-                      editor.focus();
-                    }
-                  }}
-                  onClick={() => {
-                    setFontColor(color);
-                    document.execCommand("foreColor", false, color);
-                  }}
-                  className={`w-full aspect-square rounded-full border-2 transition-transform duration-200 ${fontColor === color
-                    ? "border-zinc-400 dark:border-zinc-500 scale-110 shadow-sm"
-                    : "border-zinc-200 dark:border-zinc-700 hover:scale-105"
-                    }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-            <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
+        {/* Font color*/}
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs font-bold text-[#0D0606] dark:text-[#D9E4D1] flex items-center gap-1">
+            <Palette className="w-3.5 h-3.5" />
+          </label>
+          <div className="flex items-center gap-1.5">
+            {["#000000", "#52525b", "#ef4444", "#3b82f6", "#10b981"].map((color) => (
+              <button
+                key={color}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const selection = window.getSelection();
+                  if (!selection || selection.rangeCount === 0) return;
+                  const editor = document.getElementById("main-editor");
+                  if (editor && !editor.contains(selection.anchorNode)) {
+                    editor.focus();
+                  }
+                }}
+                onClick={() => {
+                  setFontColor(color);
+                  document.execCommand("foreColor", false, color);
+                }}
+                className={`w-6 h-6 rounded-full border-2 transition-transform duration-200 ${fontColor === color
+                  ? "border-[#0D0606] dark:border-[#D9E4D1] scale-110 shadow-sm"
+                  : "border-transparent hover:scale-105"
+                  }`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+            <div className="w-px h-5 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 mx-1"></div>
             <div
-              className="relative w-7 h-7 rounded-full overflow-hidden shrink-0 shadow-sm border border-zinc-200 dark:border-zinc-700 transition-transform hover:scale-105 ring-2 ring-transparent focus-within:ring-zinc-400"
+              className="relative w-6 h-6 rounded-full overflow-hidden shrink-0 shadow-sm border-2 border-transparent focus-within:border-[#0D0606] dark:focus-within:border-[#D9E4D1] transition-transform hover:scale-105"
               style={{ background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}
             >
               <input
@@ -252,54 +241,52 @@ export function SidebarLeft() {
           </div>
         </div>
 
+        <div className="w-px h-8 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 shrink-0"></div>
+
 
         {/* Alignment */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Alignment</label>
-          <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800/50 rounded-lg">
-            {[
-              { id: "start", icon: AlignLeft },
-              { id: "center", icon: AlignCenter },
-              { id: "end", icon: AlignRight },
-              { id: "justify", icon: AlignJustify }
-            ].map(({ id, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setTextAlign(id)}
-                className={`flex-1 py-1.5 rounded-md flex justify-center transition-colors ${textAlign === id
-                  ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-900 hover:bg-white/50 dark:hover:bg-zinc-700/50 dark:hover:text-white"
-                  }`}
-              >
-                <Icon className="w-4 h-4" />
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-1 shrink-0 p-1 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 rounded-lg">
+          {[
+            { id: "start", icon: AlignLeft },
+            { id: "center", icon: AlignCenter },
+            { id: "end", icon: AlignRight },
+            { id: "justify", icon: AlignJustify }
+          ].map(({ id, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTextAlign(id)}
+              className={`p-2 rounded-md flex justify-center transition-colors ${textAlign === id
+                ? "bg-[#0D0606] text-[#D9E4D1] dark:bg-[#D9E4D1] dark:text-[#0D0606] shadow-sm"
+                : "text-[#0D0606] dark:text-[#D9E4D1] hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10"
+                }`}
+            >
+              <Icon className="w-4 h-4" />
+            </button>
+          ))}
         </div>
 
+        <div className="w-px h-8 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 shrink-0"></div>
+
         {/* Advanced */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Advanced</label>
-          <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800/50 rounded-lg">
-            {[
-              { id: "bold", icon: Bold, isActive: isBold },
-              { id: "italic", icon: Italic, isActive: isItalic },
-              { id: "underline", icon: Underline, isActive: isUnderline },
-              { id: "strikeThrough", icon: Strikethrough, isActive: isStrikethrough }
-            ].map(({ id, icon: Icon, isActive }) => (
-              <button
-                key={id}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => setAdvanced(id)}
-                className={`flex-1 py-1.5 rounded-md flex justify-center transition-colors ${isActive
-                  ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-900 hover:bg-white/50 dark:hover:bg-zinc-700/50 dark:hover:text-white"
-                  }`}
-              >
-                <Icon className="w-4 h-4" />
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-1 shrink-0 p-1 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 rounded-lg">
+          {[
+            { id: "bold", icon: Bold, isActive: isBold },
+            { id: "italic", icon: Italic, isActive: isItalic },
+            { id: "underline", icon: Underline, isActive: isUnderline },
+            { id: "strikeThrough", icon: Strikethrough, isActive: isStrikethrough }
+          ].map(({ id, icon: Icon, isActive }) => (
+            <button
+              key={id}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setAdvanced(id)}
+              className={`p-2 rounded-md flex justify-center transition-colors ${isActive
+                ? "bg-[#0D0606] text-[#D9E4D1] dark:bg-[#D9E4D1] dark:text-[#0D0606] shadow-sm"
+                : "text-[#0D0606] dark:text-[#D9E4D1] hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10"
+                }`}
+            >
+              <Icon className="w-4 h-4" />
+            </button>
+          ))}
         </div>
       </div>
     </motion.div>

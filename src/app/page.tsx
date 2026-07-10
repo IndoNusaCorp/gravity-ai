@@ -760,14 +760,14 @@ export default function Home() {
 
   return (
     <>
-      <div className="relative flex flex-col items-center min-h-screen bg-zinc-50 dark:bg-zinc-950 font-sans overflow-x-hidden py-12 transition-colors duration-300">
+      <div className="relative flex flex-col items-center min-h-screen bg-[#D9E4D1]/50 dark:bg-[#0D0606]/50 font-sans overflow-x-hidden py-12 transition-colors duration-300">
         <Analytics />
         {/* Sidebars */}
         <SidebarLeft />
         <SidebarRight onImageUpload={handleImageUpload} />
 
         {/* Main Content Area */}
-        <main className="relative z-10 w-full flex flex-col items-center justify-start sm:p-4 transition-all duration-500 min-h-[85vh]">
+        <main className="relative z-10 w-full flex flex-col items-center justify-start sm:p-4 transition-all duration-500 min-h-[85vh] md:pl-[23rem] md:pr-72 pt-20">
 
           {/* Paper Editor Container (Wadah Kertas Utama) */}
           {/* Container for scrolling multiple pages */}
@@ -781,7 +781,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                className={`relative flex flex-col bg-white dark:bg-zinc-900 shadow-2xl rounded-sm border-2 z-10 transition-all duration-300 ease-in-out w-full min-h-[85vh] cursor-pointer ${selectedPage === index
+                className={`relative flex flex-col bg-[#D9E4D1] dark:bg-[#0D0606] shadow-2xl rounded-sm border-2 z-10 transition-all duration-300 ease-in-out w-full min-h-[85vh] cursor-pointer ${selectedPage === index
                   ? 'border-blue-500 dark:border-blue-400 shadow-blue-200/30 dark:shadow-blue-900/20'
                   : 'border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
                   }`}
@@ -794,7 +794,7 @@ export default function Home() {
                 {/* Page number badge — selalu tampil di kiri atas setiap halaman */}
                 <div className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[10px] font-bold z-20 transition-colors ${selectedPage === index
                   ? 'bg-blue-500 text-white'
-                  : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400'
+                  : 'bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 text-[#0D0606]/70 dark:text-[#D9E4D1]/70'
                   }`}>
                   {index + 1}
                 </div>
@@ -816,7 +816,7 @@ export default function Home() {
                   id={`main-editor-${index}`}
                   contentEditable
                   suppressContentEditableWarning
-                  className="absolute inset-0 w-full h-full outline-none py-16 pr-12 pl-24 text-zinc-900 dark:text-zinc-100 scrollbar-hide overflow-hidden whitespace-pre-wrap focus:outline-none z-10"
+                  className="absolute inset-0 w-full h-full outline-none py-16 pr-12 pl-24 text-[#0D0606] dark:text-[#D9E4D1] scrollbar-hide overflow-hidden whitespace-pre-wrap focus:outline-none z-10"
                   data-placeholder={index === 0 ? "Mulai menulis naskah atau klik area ini..." : ""}
                   style={{
                     fontFamily: "var(--editor-font-family, 'Inter')",
@@ -867,22 +867,22 @@ export default function Home() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="fixed top-20 sm:top-30 right-6 sm:right-10 xl:right-[calc(49.3%-var(--paper-max-width,794px)/2-3.5rem)] flex flex-col items-center p-1.5 gap-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-xl shadow-lg border border-zinc-200 dark:border-zinc-700 rounded-3xl z-50"
+              className="fixed top-20 sm:top-30 right-6 sm:right-10 xl:right-[calc(49.3%-var(--paper-max-width,794px)/2-3.5rem)] flex flex-col items-center p-1.5 gap-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-xl shadow-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 rounded-3xl z-50"
             >
               <button
                 onClick={() => handleAddPaper()}
-                className="p-2.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition-all"
+                className="p-2.5 text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:text-zinc-900 dark:text-[#0D0606]/50 dark:text-[#D9E4D1]/50 dark:hover:text-white bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition-all"
                 title="Tambah Halaman"
               >
                 <Plus className="w-4 h-4" />
               </button>
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              <span className="text-sm font-semibold text-[#0D0606] dark:text-[#D9E4D1]">
                 {(selectedPage ?? 0) + 1}/{pageNumber}
               </span>
               <button
                 onClick={() => handleDeletePaper()}
                 disabled={pageNumber <= 1}
-                className="p-2.5 text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 bg-zinc-50 dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-transparent"
+                className="p-2.5 text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:text-red-500 dark:text-[#0D0606]/50 dark:text-[#D9E4D1]/50 dark:hover:text-red-400 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-transparent"
                 title={`Hapus Halaman ${(selectedPage ?? 0) + 1}`}
               >
                 <Minus className="w-4 h-4" />
@@ -892,7 +892,7 @@ export default function Home() {
         </AnimatePresence>
 
         {/* Floating Chat & Search Overlay — ngambang di atas semua konten */}
-        <div className="fixed bottom-6 left-0 right-0 z-50 flex flex-col items-center pointer-events-none px-4 sm:px-12">
+        <div className="fixed top-16 left-0 bottom-0 w-[22rem] z-40 flex flex-col pointer-events-auto bg-[#D9E4D1]/95 dark:bg-[#0D0606]/95 backdrop-blur-xl border-r border-[#0D0606]/20 dark:border-[#D9E4D1]/20 p-4 shadow-xl">
           {/* Chat Messages */}
           <AnimatePresence>
             {isChatActive && (
@@ -901,14 +901,14 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10, transition: { duration: 0.2 } }}
                 transition={{ delay: 0.1, duration: 0.4 }}
-                className="flex flex-col gap-4 w-full max-w-xl mb-4 pointer-events-auto max-h-[50vh] overflow-y-auto scrollbar-hide p-4 bg-white/70 dark:bg-zinc-900/80 backdrop-blur-xl rounded-3xl border border-white/60 dark:border-zinc-700/60 shadow-2xl"
+                className="flex flex-col gap-4 w-full flex-1 mb-4 overflow-y-auto scrollbar-hide p-3 bg-white/50 dark:bg-black/20 backdrop-blur-xl rounded-2xl border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 shadow-inner"
                 ref={chatContainerRef}
               >
-                <div className="flex justify-between items-center w-full mb-2 border-b border-zinc-200/50 dark:border-zinc-800/50 pb-2 sticky top-0 bg-white/70 dark:bg-zinc-900/80 backdrop-blur-xl z-10 px-2 rounded-t-xl -mt-2 pt-2">
-                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest pl-2">LibraAI</span>
+                <div className="flex justify-between items-center w-full mb-2 border-b border-[#0D0606]/20 dark:border-[#D9E4D1]/20 pb-2 sticky top-0 bg-[#D9E4D1] dark:bg-[#0D0606] backdrop-blur-xl z-10 px-2 rounded-t-xl -mt-2 pt-2">
+                  <span className="text-xs font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 uppercase tracking-widest pl-2">LibraAI</span>
                   <button
                     onClick={() => setIsChatActive(false)}
-                    className="p-1.5 rounded-full text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                    className="p-1.5 rounded-full text-[#0D0606]/50 dark:text-[#D9E4D1]/50 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 hover:text-[#0D0606] dark:hover:text-[#D9E4D1] transition-colors"
                     title="Sembunyikan Obrolan"
                   >
                     <X className="w-4 h-4" />
@@ -918,18 +918,18 @@ export default function Home() {
                 <div className="flex flex-col gap-6 px-1 pb-2">
                   {chatHistory.map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start w-full'}`}>
-                      <div className={`${msg.role === 'user' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-tr-sm max-w-[85%]' : 'bg-zinc-900 dark:bg-zinc-100 rounded-tl-sm w-fit max-w-[95%] text-white dark:text-zinc-900'} px-5 py-4 rounded-2xl shadow-sm overflow-x-auto`}>
-                        <div className={`font-medium leading-relaxed text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'text-zinc-900 dark:text-white' : ''}`}>
+                      <div className={`${msg.role === 'user' ? 'bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-tr-sm max-w-[85%]' : 'bg-[#0D0606] dark:bg-[#D9E4D1] rounded-tl-sm w-fit max-w-[95%] text-[#D9E4D1] dark:text-[#0D0606]'} px-5 py-4 rounded-2xl shadow-sm overflow-x-auto`}>
+                        <div className={`font-medium leading-relaxed text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'text-[#0D0606] dark:text-[#D9E4D1]' : ''}`}>
                           {msg.role === 'user' ? msg.content : <Markdown>{msg.content}</Markdown>}
                         </div>
                         {/* Tombol "Tulis ke Paper" — hanya muncul di respons AI */}
                         {msg.role === 'friend' && (
-                          <div className="flex items-center gap-2 mt-3 pt-2 border-t border-white/10 dark:border-zinc-800/30">
+                          <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[#0D0606]/10 dark:border-[#D9E4D1]/10">
                             <button
                               onClick={() => insertToPaper(msg.content, idx)}
                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${insertedIndex === idx
                                 ? 'bg-green-500/20 text-green-300 dark:text-green-600'
-                                : 'bg-white/10 dark:bg-zinc-800/50 text-white/70 dark:text-zinc-500 hover:bg-white/20 dark:hover:bg-zinc-700/50 hover:text-white dark:hover:text-zinc-300'
+                                : 'bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 text-white/70 dark:text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:bg-white/20 dark:hover:bg-zinc-700/50 hover:text-white dark:hover:text-zinc-300'
                                 }`}
                               title="Tulis ke Paper"
                             >
@@ -947,7 +947,7 @@ export default function Home() {
 
                   {isLoading && (
                     <div className="flex justify-start w-full">
-                      <div className="bg-zinc-900 dark:bg-zinc-100 px-5 py-4 rounded-2xl rounded-tl-sm w-fit shadow-md">
+                      <div className="bg-[#0D0606] dark:bg-[#D9E4D1] px-5 py-4 rounded-2xl rounded-tl-sm w-fit shadow-md">
                         <div className="flex gap-1.5 items-center justify-center h-4 px-2">
                           <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
                           <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
@@ -969,35 +969,35 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 5, transition: { duration: 0.15 } }}
                 transition={{ duration: 0.3 }}
-                className="flex items-center justify-center gap-2 mb-3 pointer-events-auto"
+                className="grid grid-cols-2 gap-2 w-full mb-3"
               >
                 <button
                   onClick={() => setQuickActionModal({ open: true, type: 'paper_research', label: 'Research' })}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-lg border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 rounded-xl text-xs w-full justify-center font-semibold text-[#0D0606] dark:text-[#D9E4D1] hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
                 >
                   <BookOpen className="w-3.5 h-3.5" />
                   Buat Research
                 </button>
                 <button
                   onClick={() => setQuickActionModal({ open: true, type: 'paper_skripsi', label: 'Skripsi' })}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-lg border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 rounded-xl text-xs w-full justify-center font-semibold text-[#0D0606] dark:text-[#D9E4D1] hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
                 >
                   <GraduationCap className="w-3.5 h-3.5" />
                   Buat Skripsi
                 </button>
                 <button
                   onClick={() => setQuickActionModal({ open: true, type: 'paper_artikel', label: 'Artikel Ilmiah' })}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-lg border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 rounded-xl text-xs w-full justify-center font-semibold text-[#0D0606] dark:text-[#D9E4D1] hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
                 >
                   <Newspaper className="w-3.5 h-3.5" />
                   Buat Artikel
                 </button>
-                <div className="w-[1px] h-6 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
+                <div className="w-[1px] h-6 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 mx-1"></div>
                 <button
                   onClick={() => setIsMoreFeaturesOpen(!isMoreFeaturesOpen)}
                   className={`flex items-center justify-center p-2 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95 border ${isMoreFeaturesOpen
-                      ? 'bg-zinc-200 dark:bg-zinc-700 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white'
-                      : 'bg-white/90 dark:bg-zinc-800/90 border-zinc-200/80 dark:border-zinc-700/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                    ? 'bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 border-zinc-300 dark:border-zinc-600 text-[#0D0606] dark:text-[#D9E4D1]'
+                    : 'bg-white/90 dark:bg-zinc-800/90 border-[#0D0606]/20 dark:border-[#D9E4D1]/20 text-[#0D0606] dark:text-[#D9E4D1] hover:bg-zinc-100 dark:hover:bg-zinc-700'
                     }`}
                   title="Fitur Lainnya"
                 >
@@ -1015,48 +1015,48 @@ export default function Home() {
                 animate={{ opacity: 1, height: 'auto', scale: 1 }}
                 exit={{ opacity: 0, height: 0, scale: 0.95, transition: { duration: 0.15 } }}
                 transition={{ duration: 0.3 }}
-                className="flex flex-wrap items-center justify-center gap-2 mb-4 pointer-events-auto px-4 max-w-3xl overflow-hidden"
+                className="grid grid-cols-2 gap-2 w-full mb-4 overflow-y-auto"
               >
                 {/* 1. Auto-Citation */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'citation' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/80 dark:border-blue-800/50 rounded-lg text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                <button onClick={() => setFeatureModal({ open: true, type: 'citation' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/80 dark:border-blue-800/50 rounded-lg text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
                   <LinkIcon className="w-3.5 h-3.5" /> Sitasi & Pustaka
                 </button>
 
                 {/* 2. Upload PDF (Chat with Papers) */}
                 <div className="relative">
                   <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="Upload Jurnal PDF" />
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50/80 dark:bg-purple-900/20 border border-purple-200/80 dark:border-purple-800/50 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md pointer-events-none">
+                  <button className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-purple-50/80 dark:bg-purple-900/20 border border-purple-200/80 dark:border-purple-800/50 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md pointer-events-none">
                     <Upload className="w-3.5 h-3.5" /> Chat w/ Papers
                   </button>
                 </div>
 
                 {/* 3. Paraphraser */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'paraphrase' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50/80 dark:bg-emerald-900/20 border border-emerald-200/80 dark:border-emerald-800/50 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                <button onClick={() => setFeatureModal({ open: true, type: 'paraphrase' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-emerald-50/80 dark:bg-emerald-900/20 border border-emerald-200/80 dark:border-emerald-800/50 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
                   <Edit3 className="w-3.5 h-3.5" /> Academic Tone
                 </button>
 
                 {/* 4. Math Equation LaTeX */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'math' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50/80 dark:bg-amber-900/20 border border-amber-200/80 dark:border-amber-800/50 rounded-lg text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                <button onClick={() => setFeatureModal({ open: true, type: 'math' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-amber-50/80 dark:bg-amber-900/20 border border-amber-200/80 dark:border-amber-800/50 rounded-lg text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
                   <Calculator className="w-3.5 h-3.5" /> Math Equation
                 </button>
 
                 {/* 5. Auto Abstract */}
-                <button onClick={handleAutoAbstract} className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50/80 dark:bg-rose-900/20 border border-rose-200/80 dark:border-rose-800/50 rounded-lg text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                <button onClick={handleAutoAbstract} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-rose-50/80 dark:bg-rose-900/20 border border-rose-200/80 dark:border-rose-800/50 rounded-lg text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
                   <AlignLeft className="w-3.5 h-3.5" /> Auto Abstrak
                 </button>
 
                 {/* 6. Virtual Advisor */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'advisor' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 dark:bg-indigo-900/20 border border-indigo-200/80 dark:border-indigo-800/50 rounded-lg text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                <button onClick={() => setFeatureModal({ open: true, type: 'advisor' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-indigo-50/80 dark:bg-indigo-900/20 border border-indigo-200/80 dark:border-indigo-800/50 rounded-lg text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
                   <MessageSquare className="w-3.5 h-3.5" /> Virtual Advisor
                 </button>
 
                 {/* 7. Table Formatter */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'table' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50/80 dark:bg-cyan-900/20 border border-cyan-200/80 dark:border-cyan-800/50 rounded-lg text-xs font-semibold text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                <button onClick={() => setFeatureModal({ open: true, type: 'table' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-cyan-50/80 dark:bg-cyan-900/20 border border-cyan-200/80 dark:border-cyan-800/50 rounded-lg text-xs font-semibold text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
                   <Table className="w-3.5 h-3.5" /> Data ke Tabel
                 </button>
 
                 {/* 8. Smart Outline */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'outline' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50/80 dark:bg-orange-900/20 border border-orange-200/80 dark:border-orange-800/50 rounded-lg text-xs font-semibold text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
+                <button onClick={() => setFeatureModal({ open: true, type: 'outline' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-orange-50/80 dark:bg-orange-900/20 border border-orange-200/80 dark:border-orange-800/50 rounded-lg text-xs font-semibold text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
                   <Network className="w-3.5 h-3.5" /> Smart Outline
                 </button>
               </motion.div>
@@ -1066,13 +1066,13 @@ export default function Home() {
           {/* Search Input — selalu terlihat di bawah layar */}
           <motion.div
             layout
-            className="w-full max-w-xl relative group shrink-0 pointer-events-auto"
+            className="w-full mt-auto relative group shrink-0"
           >
             <div className={`absolute inset-0 bg-zinc-900/5 dark:bg-white/5 rounded-2xl blur-xl transition-all duration-300 ${isFocused ? "opacity-100 scale-105" : "opacity-0 scale-100"}`} />
 
-            <div className={`relative flex items-center bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border-2 rounded-2xl p-2 transition-colors duration-300 shadow-2xl shadow-zinc-300/30 dark:shadow-black/50 ${isFocused ? "border-zinc-900 dark:border-white" : "border-zinc-200/80 dark:border-zinc-800/80"}`}>
+            <div className={`relative flex items-center bg-[#D9E4D1]/90 dark:bg-[#0D0606]/90 backdrop-blur-xl border-2 rounded-2xl p-2 transition-colors duration-300 shadow-2xl shadow-zinc-300/30 dark:shadow-black/50 ${isFocused ? "border-[#0D0606] dark:border-[#D9E4D1]" : "border-zinc-200/80 dark:border-zinc-800/80"}`}>
               <div className="pl-4 pr-3">
-                <Search className={`w-5 h-5 transition-colors duration-300 ${isFocused ? "text-zinc-900 dark:text-white" : "text-zinc-400"}`} />
+                <Search className={`w-5 h-5 transition-colors duration-300 ${isFocused ? "text-[#0D0606] dark:text-[#D9E4D1]" : "text-[#0D0606]/50 dark:text-[#D9E4D1]/50"}`} />
               </div>
 
               {/* Input Teks untuk ngobrol dengan AI */}
@@ -1084,11 +1084,11 @@ export default function Home() {
                 placeholder="Tanya LibraAI tentang Research, Skripsi, atau Artikel Ilmiah"
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
-                className="w-full bg-transparent border-none outline-none py-3 pr-4 text-zinc-900 dark:text-white placeholder:text-zinc-400 text-sm font-medium"
+                className="w-full bg-transparent border-none outline-none py-3 pr-4 text-[#0D0606] dark:text-[#D9E4D1] placeholder:text-[#0D0606]/50 dark:text-[#D9E4D1]/50 text-sm font-medium"
               />
               <button
                 onClick={handleStart}
-                className="hidden sm:flex items-center justify-center gap-2 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 w-12 h-12 rounded-xl font-medium transition-all shadow-sm active:scale-95 group-hover:shadow-md border border-transparent dark:border-zinc-200">
+                className="hidden sm:flex items-center justify-center gap-2 bg-[#0D0606] dark:bg-[#D9E4D1] hover:bg-zinc-800 dark:hover:bg-zinc-200 text-[#D9E4D1] dark:text-[#0D0606] w-12 h-12 rounded-xl font-medium transition-all shadow-sm active:scale-95 group-hover:shadow-md border border-transparent dark:border-zinc-200">
                 <Send className="w-5 h-5 ml-1" />
               </button>
             </div>
@@ -1104,7 +1104,7 @@ export default function Home() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.3 }}
-            className="fixed top-6 right-6 z-[100] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold border border-zinc-700 dark:border-zinc-200"
+            className="fixed top-6 right-6 z-[100] bg-[#0D0606] dark:bg-[#D9E4D1] text-[#D9E4D1] dark:text-[#0D0606] px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold border border-zinc-700 dark:border-zinc-200"
           >
             {toast.message}
           </motion.div>
@@ -1125,19 +1125,19 @@ export default function Home() {
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-zinc-200 dark:border-zinc-800"
+              className="bg-[#D9E4D1] dark:bg-[#0D0606] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-[#0D0606]/20 dark:border-[#D9E4D1]/20"
             >
-              <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+              <div className="p-5 border-b border-[#0D0606]/10 dark:border-[#D9E4D1]/10 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
-                    {featureModal.type === 'citation' && <LinkIcon className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
-                    {featureModal.type === 'paraphrase' && <Edit3 className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
-                    {featureModal.type === 'math' && <Calculator className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
-                    {featureModal.type === 'advisor' && <MessageSquare className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
-                    {featureModal.type === 'table' && <Table className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
-                    {featureModal.type === 'outline' && <Network className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
+                  <div className="p-2 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-xl">
+                    {featureModal.type === 'citation' && <LinkIcon className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
+                    {featureModal.type === 'paraphrase' && <Edit3 className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
+                    {featureModal.type === 'math' && <Calculator className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
+                    {featureModal.type === 'advisor' && <MessageSquare className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
+                    {featureModal.type === 'table' && <Table className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
+                    {featureModal.type === 'outline' && <Network className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
                   </div>
-                  <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                  <h3 className="text-lg font-bold text-[#0D0606] dark:text-[#D9E4D1]">
                     {featureModal.type === 'citation' && 'Buat Sitasi / Daftar Pustaka'}
                     {featureModal.type === 'paraphrase' && 'Academic Tone Paraphraser'}
                     {featureModal.type === 'math' && 'Buat Rumus Matematika'}
@@ -1148,14 +1148,14 @@ export default function Home() {
                 </div>
                 <button
                   onClick={() => { setFeatureModal({ open: false, type: '' }); setFeatureInput(''); }}
-                  className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  className="p-2 text-[#0D0606]/50 dark:text-[#D9E4D1]/50 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-lg hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="p-5">
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                <label className="block text-sm font-medium text-[#0D0606] dark:text-[#D9E4D1] mb-2">
                   {featureModal.type === 'citation' && 'Masukkan Judul / Link Jurnal / DOI:'}
                   {featureModal.type === 'paraphrase' && 'Masukkan Teks yang Ingin Diubah:'}
                   {featureModal.type === 'math' && 'Jelaskan Rumus yang Ingin Dibuat:'}
@@ -1176,7 +1176,7 @@ export default function Home() {
                               'Contoh: Pengaruh AI terhadap Produktivitas Mahasiswa'
                   }
                   rows={4}
-                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition-all resize-none"
+                  className="w-full bg-[#D9E4D1] dark:bg-[#0D0606] border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 rounded-xl px-4 py-3 text-sm text-[#0D0606] dark:text-[#D9E4D1] outline-none focus:ring-2 focus:ring-[#0D0606] dark:focus:ring-[#D9E4D1] transition-all resize-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -1191,10 +1191,10 @@ export default function Home() {
                 />
               </div>
 
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-950/50 border-t border-zinc-100 dark:border-zinc-800 flex justify-end gap-2">
+              <div className="p-4 bg-[#D9E4D1] dark:bg-[#0D0606]/50 border-t border-[#0D0606]/10 dark:border-[#D9E4D1]/10 flex justify-end gap-2">
                 <button
                   onClick={() => { setFeatureModal({ open: false, type: '' }); setFeatureInput(''); }}
-                  className="px-4 py-2 text-sm font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                  className="px-4 py-2 text-sm font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:text-[#0D0606] dark:hover:text-[#D9E4D1] transition-colors"
                 >
                   Batal
                 </button>
@@ -1232,18 +1232,18 @@ export default function Home() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.3 }}
-              className="bg-white dark:bg-zinc-900 rounded-3xl p-8 w-full max-w-md shadow-2xl border border-zinc-200 dark:border-zinc-800"
+              className="bg-[#D9E4D1] dark:bg-[#0D0606] rounded-3xl p-8 w-full max-w-md shadow-2xl border border-[#0D0606]/20 dark:border-[#D9E4D1]/20"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
-                  {quickActionModal.type === 'paper_research' && <BookOpen className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
-                  {quickActionModal.type === 'paper_skripsi' && <GraduationCap className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
-                  {quickActionModal.type === 'paper_artikel' && <Newspaper className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />}
+                <div className="p-2.5 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-xl">
+                  {quickActionModal.type === 'paper_research' && <BookOpen className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
+                  {quickActionModal.type === 'paper_skripsi' && <GraduationCap className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
+                  {quickActionModal.type === 'paper_artikel' && <Newspaper className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Buat {quickActionModal.label}</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Masukkan topik, LibraAI akan langsung menulisnya ke paper</p>
+                  <h3 className="text-lg font-bold text-[#0D0606] dark:text-[#D9E4D1]">Buat {quickActionModal.label}</h3>
+                  <p className="text-xs text-[#0D0606]/70 dark:text-[#D9E4D1]/70">Masukkan topik, LibraAI akan langsung menulisnya ke paper</p>
                 </div>
               </div>
 
@@ -1253,21 +1253,21 @@ export default function Home() {
                 onChange={(e) => setQuickActionTopic(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') sendToAIForPaper(quickActionTopic, quickActionModal.type); }}
                 placeholder={`Contoh: Pengaruh AI terhadap pendidikan di Indonesia`}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-900 dark:focus:border-white rounded-xl px-4 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 outline-none transition-colors"
+                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-[#0D0606]/20 dark:border-[#D9E4D1]/20 focus:border-zinc-900 dark:focus:border-white rounded-xl px-4 py-3 text-sm text-[#0D0606] dark:text-[#D9E4D1] placeholder:text-[#0D0606]/50 dark:text-[#D9E4D1]/50 outline-none transition-colors"
                 autoFocus
               />
 
               <div className="flex items-center gap-3 mt-6">
                 <button
                   onClick={() => { setQuickActionModal({ open: false, type: "", label: "" }); setQuickActionTopic(""); }}
-                  className="flex-1 px-4 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-sm font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  className="flex-1 px-4 py-3 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-[#0D0606] dark:text-[#D9E4D1] rounded-xl text-sm font-semibold hover:bg-[#0D0606]/20 dark:hover:bg-[#D9E4D1]/20 transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   onClick={() => sendToAIForPaper(quickActionTopic, quickActionModal.type)}
                   disabled={!quickActionTopic.trim() || isLoading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl text-sm font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#0D0606] dark:bg-[#D9E4D1] text-[#D9E4D1] dark:text-[#0D0606] rounded-xl text-sm font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
                 >
                   <PenTool className="w-4 h-4" />
                   Generate & Tulis

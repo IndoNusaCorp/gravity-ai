@@ -3,12 +3,9 @@
 import { motion } from "framer-motion";
 import { Settings, Printer, Palette, Layers, FileText, Image, User } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { Authentication } from "../firebase/firebase.configuration";
 import { AuthModal, AuthType } from "./AuthModal";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface SidebarRightProps {
     onImageUpload?: (src: string) => void;
@@ -24,6 +21,7 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
     //State untuk koneksikan Authentication ke SidebarRight
     const [username, getusername] = useState<string | null>(null);
     const [email, getemail] = useState<string | null>(null);
+    const [photoURL, setPhotoURL] = useState<string | null>(null);
     const [password, getpassword] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -237,21 +235,22 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
         }
     };
 
-    //efek untuk mengambil data user dari supabase
+    //efek untuk mengambil data user dari firebase
     useEffect(() => {
-        const fetchUser = async () => {
-            const { data: user, error } = await supabase.auth.getUser();
-            if (error) {
-                console.error("Error fetching user:", error);
+        const unsubscribe = onAuthStateChanged(Authentication, (user) => {
+            if (user) {
+                getusername(user.displayName || null);
+                getemail(user.email || null);
+                setPhotoURL(user.photoURL || null);
             } else {
-                if (user?.user) {
-                    getusername(user.user.user_metadata?.username || null);
-                    getemail(user.user.email || null);
-                }
+                getusername(null);
+                getemail(null);
+                setPhotoURL(null);
             }
             setLoading(false);
-        };
-        fetchUser();
+        });
+
+        return () => unsubscribe();
     }, []);
 
     return (
@@ -260,70 +259,98 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                 initial={{ x: 300, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.1 }}
-                className="fixed right-0 top-0 h-full w-72 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-l border-zinc-200 dark:border-zinc-800 p-6 z-40 hidden md:block pt-20 overflow-y-auto scrollbar-hide"
+                className="fixed right-0 top-16 h-[calc(100%-4rem)] w-72 bg-[#D9E4D1] dark:bg-[#0D0606] backdrop-blur-xl border-l border-[#0D0606]/20 dark:border-[#D9E4D1]/20 p-6 z-40 hidden md:block pt-6 overflow-y-auto scrollbar-hide"
             >
 
-                <div className="flex items-center gap-2 mb-8">
-                    <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                        <User className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                <div className="flex items-center gap-2 mb-6">
+                    <div className="w-8 h-8 rounded-lg bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center border border-[#0D0606]/20 dark:border-[#D9E4D1]/20">
+                        <User className="w-4 h-4 text-[#0D0606] dark:text-[#D9E4D1]" />
                     </div>
-                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Account Settings</h2>
+                    <h2 className="text-lg font-semibold text-[#0D0606] dark:text-[#D9E4D1]">Account</h2>
                 </div>
 
-                <div className="flex flex-col items-center justify-center w-full mb-8">
-                    <div className="flex w-24 h-24 bg-zinc-200 dark:bg-zinc-800 rounded-full items-center justify-center border-4 border-white dark:border-zinc-800 shadow-md overflow-hidden mb-4 relative">
-                        <User className="w-12 h-12 text-zinc-400 dark:text-zinc-500" />
-                        {loading && <div className="absolute inset-0 bg-zinc-200/50 dark:bg-zinc-800/50 animate-pulse rounded-full" />}
-                    </div>
-
-                    {loading ? (
-                        <div className="flex flex-col items-center gap-3 w-full">
-                            <div className="h-5 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse"></div>
-                            <div className="h-4 w-32 bg-zinc-100 dark:bg-zinc-800/50 rounded animate-pulse mb-3"></div>
-                        </div>
-                    ) : email ? (
-                        <div className="flex flex-col items-center">
-                            <span className="text-zinc-900 dark:text-zinc-100 font-semibold text-lg">{username || email.split('@')[0]}</span>
-                            <span className="text-zinc-500 dark:text-zinc-400 text-sm mb-3">{email}</span>
-                            <button
-                                onClick={async () => {
-                                    await supabase.auth.signOut();
-                                    window.location.reload();
-                                }}
-                                className="text-xs bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 px-4 py-2 rounded-lg font-medium hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
-                            >
-                                Log Out
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center gap-3">
-                            <span className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">Guest User</span>
-                            <div className="flex gap-2">
-                                <button onClick={() => { setAuthModalType('login'); setIsAuthModalOpen(true); }} className="text-sm bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity">Login</button>
-                                <button onClick={() => { setAuthModalType('register'); setIsAuthModalOpen(true); }} className="text-sm border border-zinc-200 text-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-4 py-2 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">Register</button>
+                <div className="w-full mb-8 relative">
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#0D0606]/5 dark:from-[#D9E4D1]/5 to-transparent rounded-2xl pointer-events-none" />
+                    <div className="relative w-full p-5 bg-white/50 dark:bg-[#0D0606]/40 backdrop-blur-2xl border border-white/20 dark:border-white/5 rounded-2xl shadow-lg">
+                        
+                        {loading ? (
+                            <div className="flex items-center gap-4 animate-pulse">
+                                <div className="w-14 h-14 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-full" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-4 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded w-2/3" />
+                                    <div className="h-3 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 rounded w-1/2" />
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        ) : email ? (
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-[#0D0606]/20 dark:border-[#D9E4D1]/20 shadow-md">
+                                        {photoURL ? (
+                                            <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center">
+                                                <User className="w-6 h-6 text-[#0D0606] dark:text-[#D9E4D1]" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-[#0D0606] dark:text-[#D9E4D1] font-semibold truncate text-sm">
+                                            {username || email.split('@')[0]}
+                                        </h3>
+                                        <p className="text-xs text-[#0D0606]/60 dark:text-[#D9E4D1]/60 truncate mt-0.5">
+                                            {email}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        await signOut(Authentication);
+                                        window.location.reload();
+                                    }}
+                                    className="w-full py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-medium text-xs transition-all border border-red-500/20 hover:border-red-500/30 active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    Log Out
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center text-center py-2">
+                                <div className="w-14 h-14 mb-3 rounded-full bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 flex items-center justify-center border border-[#0D0606]/10 dark:border-[#D9E4D1]/10">
+                                    <User className="w-6 h-6 text-[#0D0606]/40 dark:text-[#D9E4D1]/40" />
+                                </div>
+                                <h3 className="text-[#0D0606] dark:text-[#D9E4D1] font-medium text-sm mb-1">Not Logged In</h3>
+                                <p className="text-xs text-[#0D0606]/60 dark:text-[#D9E4D1]/60 mb-5 max-w-[180px]">
+                                    Sign in to sync your documents and settings.
+                                </p>
+                                <button
+                                    onClick={() => { setAuthModalType('login'); setIsAuthModalOpen(true); }}
+                                    className="w-full py-2.5 rounded-xl bg-[#0D0606] hover:bg-[#0D0606]/80 text-[#D9E4D1] dark:bg-[#D9E4D1] dark:hover:bg-[#D9E4D1]/80 dark:text-[#0D0606] font-medium text-sm transition-all shadow-md hover:shadow-lg active:scale-95"
+                                >
+                                    Sign in with Google
+                                </button>
+                            </div>
+                        )}
+
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-2 mb-8">
-                    <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                        <Settings className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                    <div className="w-8 h-8 rounded-lg bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center">
+                        <Settings className="w-4 h-4 text-[#0D0606]/70 dark:text-[#D9E4D1]/70" />
                     </div>
-                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Paper Settings</h2>
+                    <h2 className="text-lg font-semibold text-[#0D0606] dark:text-[#D9E4D1]">Paper Settings</h2>
                 </div>
 
                 <div className="space-y-8">
                     {/* Paper Size Settings */}
                     <div className="space-y-3">
-                        <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                        <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
                             <FileText className="w-3.5 h-3.5" /> Paper Size
                         </label>
                         <div className="relative">
                             <select
                                 value={paperType}
                                 onChange={(e) => setPaperType(e.target.value)}
-                                className="w-full appearance-none bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition-all cursor-pointer"
+                                className="w-full appearance-none bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 text-[#0D0606] dark:text-[#D9E4D1] text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#0D0606] dark:focus:ring-[#D9E4D1] transition-all cursor-pointer"
                             >
                                 {paperTypes.map((type) => (
                                     <option key={type.value} value={type.value}>
@@ -339,7 +366,7 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
 
                     {/* Color Settings */}
                     <div className="space-y-3">
-                        <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                        <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
                             <Palette className="w-3.5 h-3.5" /> Paper Color
                         </label>
                         <div className="grid grid-cols-5 gap-2">
@@ -348,8 +375,8 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                                     key={color}
                                     onClick={() => setPaperColor(color)}
                                     className={`w-full aspect-square rounded-full border-2 transition-transform duration-200 ${paperColor === color
-                                        ? "border-zinc-900 dark:border-white scale-110 shadow-sm"
-                                        : "border-transparent border-zinc-200 dark:border-zinc-700 hover:scale-105"
+                                        ? "border-[#0D0606] dark:border-[#D9E4D1] scale-110 shadow-sm"
+                                        : "border-transparent border-[#0D0606]/20 dark:border-[#D9E4D1]/20 hover:scale-105"
                                         }`}
                                     style={{ backgroundColor: color }}
                                 />
@@ -359,14 +386,14 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
 
                     {/* Paper Texture/Style (Placeholder) */}
                     <div className="space-y-3">
-                        <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                        <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
                             <Layers className="w-3.5 h-3.5" /> Texture
                         </label>
                         <div className="grid grid-cols-2 gap-2">
-                            <button className="py-2.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                            <button className="py-2.5 px-3 rounded-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] text-sm font-medium hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 transition-colors">
                                 Plain
                             </button>
-                            <button className="py-2.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-500">
+                            <button className="py-2.5 px-3 rounded-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 text-sm font-medium hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 transition-colors text-zinc-500">
                                 Grid
                             </button>
                         </div>
@@ -374,7 +401,7 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
 
                     {/* Upload Image */}
                     <div className="space-y-3">
-                        <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                        <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
                             <Image className="w-3.5 h-3.5" /> Upload Image
                         </label>
                         <div className="grid grid-cols-2 gap-2">
@@ -387,7 +414,7 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                             />
                             <button
                                 onClick={handleUploadClick}
-                                className="py-2.5 px-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                                className="py-2.5 px-3 rounded-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] text-sm font-medium hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 transition-colors"
                             >
                                 Upload Image
                             </button>
@@ -396,7 +423,7 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
 
                     {/* Download File Section */}
                     <div className="space-y-3">
-                        <label className="text-xs uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                        <label className="text-xs uppercase tracking-wider font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
                             <Image className="w-3.5 h-3.5 opacity-70" />
                             Manajemen File
                         </label>
@@ -409,8 +436,8 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                 py-2.5 px-3 rounded-lg border text-sm font-medium transition-all duration-200
                 flex items-center justify-center gap-2
                 ${isDownload
-                                        ? "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 active:scale-95"
-                                        : "border-transparent bg-zinc-100 dark:bg-zinc-800/50 text-zinc-400 cursor-pointer"}
+                                        ? "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 active:scale-95"
+                                        : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}
             `}
                             >
                                 <Image className="w-4 h-4" />
@@ -420,8 +447,8 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                     </div>
 
                     {/* Print Action */}
-                    <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
-                        <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-900 transition-all font-medium text-sm shadow-md hover:shadow-lg active:scale-95">
+                    <div className="pt-4 border-t border-[#0D0606]/20 dark:border-[#D9E4D1]/20">
+                        <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#0D0606] hover:bg-[#0D0606]/80 text-[#D9E4D1] dark:bg-[#D9E4D1] dark:hover:bg-[#D9E4D1]/80 dark:text-[#0D0606] transition-all font-medium text-sm shadow-md hover:shadow-lg active:scale-95">
                             <Printer className="w-4 h-4" />
                             Print Paper
                         </button>
