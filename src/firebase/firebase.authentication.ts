@@ -15,9 +15,4 @@ export async function SignInAndRegisterWithGoogleSystem() {
     } catch (error) {
         console.log("Sign in with google system error, please try again");
     }
-
-
-
-
-
 }
