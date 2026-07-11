@@ -867,7 +867,7 @@ export default function Home() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="fixed top-20 sm:top-30 right-6 sm:right-10 xl:right-[calc(49.3%-var(--paper-max-width,794px)/2-3.5rem)] flex flex-col items-center p-1.5 gap-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-xl shadow-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 rounded-3xl z-50"
+              className="fixed top-20 sm:top-30 right-2 sm:right-6 xl:right-[calc(49.3%-var(--paper-max-width,794px)/2-6rem)] flex flex-col items-center p-1.5 gap-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-xl shadow-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 rounded-3xl z-50"
             >
               <button
                 onClick={() => handleAddPaper()}
@@ -892,7 +892,7 @@ export default function Home() {
         </AnimatePresence>
 
         {/* Floating Chat & Search Overlay — ngambang di atas semua konten */}
-        <div className="fixed top-16 left-0 bottom-0 w-[22rem] z-40 flex flex-col pointer-events-auto bg-[#D9E4D1]/95 dark:bg-[#0D0606]/95 backdrop-blur-xl border-r border-[#0D0606]/20 dark:border-[#D9E4D1]/20 p-4 shadow-xl">
+        <div className="fixed top-24 left-2 right-2 sm:right-auto sm:left-6 bottom-20 md:bottom-24 sm:w-[22rem] z-40 flex flex-col pointer-events-auto bg-white/40 dark:bg-[#0D0606]/40 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-3xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
           {/* Chat Messages */}
           <AnimatePresence>
             {isChatActive && (

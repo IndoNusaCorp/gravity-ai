@@ -121,7 +121,7 @@ export function SidebarLeft() {
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 100, damping: 20 }}
-      className="fixed left-0 top-0 w-full h-16 bg-[#D9E4D1] dark:bg-[#0D0606] border-b border-[#0D0606]/20 dark:border-[#D9E4D1]/20 px-4 z-40 hidden md:flex items-center shadow-md"
+      className="fixed left-1/2 -translate-x-1/2 top-2 md:top-4 w-[95%] md:w-[90%] max-w-6xl h-14 md:h-16 bg-white/40 dark:bg-[#0D0606]/40 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl px-2 md:px-4 z-40 flex items-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]"
     >
       <div className="flex items-center gap-6 overflow-x-auto w-full scrollbar-hide h-full py-2">
         {/* Font Family Selection */}

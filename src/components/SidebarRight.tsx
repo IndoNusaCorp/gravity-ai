@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, Printer, Palette, Layers, FileText, Image, User, DockIcon, HardDrive, Server, X, CheckCircle, AlertCircle, Loader2, FolderOpen } from "lucide-react";
+import { Settings, Printer, Palette, Layers, FileText, Image, User, DockIcon, HardDrive, Server, X, CheckCircle, AlertCircle, Loader2, FolderOpen, Upload } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Authentication } from "../firebase/firebase.configuration";
@@ -359,220 +359,200 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
 
     return (
         <>
+            {/* Account - Navbar Top Right */}
             <motion.div
-                initial={{ x: 300, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.1 }}
-                className="fixed right-0 top-16 h-[calc(100%-4rem)] w-72 bg-[#D9E4D1] dark:bg-[#0D0606] backdrop-blur-xl border-l border-[#0D0606]/20 dark:border-[#D9E4D1]/20 p-6 z-40 hidden md:block pt-6 overflow-y-auto scrollbar-hide"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="fixed top-20 md:top-6 right-2 md:right-8 z-50 block"
             >
-
-                <div className="flex items-center gap-2 mb-6">
-                    <div className="w-8 h-8 rounded-lg bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center border border-[#0D0606]/20 dark:border-[#D9E4D1]/20">
-                        <User className="w-4 h-4 text-[#0D0606] dark:text-[#D9E4D1]" />
-                    </div>
-                    <h2 className="text-lg font-semibold text-[#0D0606] dark:text-[#D9E4D1]">Account</h2>
-                </div>
-
-                <div className="w-full mb-8 relative">
-                    <div className="absolute inset-0 bg-gradient-to-b from-[#0D0606]/5 dark:from-[#D9E4D1]/5 to-transparent rounded-2xl pointer-events-none" />
-                    <div className="relative w-full p-5 bg-white/50 dark:bg-[#0D0606]/40 backdrop-blur-2xl border border-white/20 dark:border-white/5 rounded-2xl shadow-lg">
-                        
-                        {loading ? (
-                            <div className="flex items-center gap-4 animate-pulse">
-                                <div className="w-14 h-14 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-full" />
-                                <div className="flex-1 space-y-2">
-                                    <div className="h-4 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded w-2/3" />
-                                    <div className="h-3 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 rounded w-1/2" />
-                                </div>
-                            </div>
-                        ) : email ? (
-                            <div className="flex flex-col">
-                                <div className="flex items-center gap-4 mb-4">
-                                    <div className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-[#0D0606]/20 dark:border-[#D9E4D1]/20 shadow-md">
-                                        {photoURL ? (
-                                            <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center">
-                                                <User className="w-6 h-6 text-[#0D0606] dark:text-[#D9E4D1]" />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="text-[#0D0606] dark:text-[#D9E4D1] font-semibold truncate text-sm">
-                                            {username || email.split('@')[0]}
-                                        </h3>
-                                        <p className="text-xs text-[#0D0606]/60 dark:text-[#D9E4D1]/60 truncate mt-0.5">
-                                            {email}
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={async () => {
-                                        await signOut(Authentication);
-                                        window.location.reload();
-                                    }}
-                                    className="w-full py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-medium text-xs transition-all border border-red-500/20 hover:border-red-500/30 active:scale-95 flex items-center justify-center gap-2"
-                                >
-                                    Log Out
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center text-center py-2">
-                                <div className="w-14 h-14 mb-3 rounded-full bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 flex items-center justify-center border border-[#0D0606]/10 dark:border-[#D9E4D1]/10">
-                                    <User className="w-6 h-6 text-[#0D0606]/40 dark:text-[#D9E4D1]/40" />
-                                </div>
-                                <h3 className="text-[#0D0606] dark:text-[#D9E4D1] font-medium text-sm mb-1">Not Logged In</h3>
-                                <p className="text-xs text-[#0D0606]/60 dark:text-[#D9E4D1]/60 mb-5 max-w-[180px]">
-                                    Sign in to sync your documents and settings.
-                                </p>
-                                <button
-                                    onClick={() => { setAuthModalType('login'); setIsAuthModalOpen(true); }}
-                                    className="w-full py-2.5 rounded-xl bg-[#0D0606] hover:bg-[#0D0606]/80 text-[#D9E4D1] dark:bg-[#D9E4D1] dark:hover:bg-[#D9E4D1]/80 dark:text-[#0D0606] font-medium text-sm transition-all shadow-md hover:shadow-lg active:scale-95"
-                                >
-                                    Sign in with Google
-                                </button>
-                            </div>
-                        )}
-
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 mb-8">
-                    <div className="w-8 h-8 rounded-lg bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center">
-                        <Settings className="w-4 h-4 text-[#0D0606]/70 dark:text-[#D9E4D1]/70" />
-                    </div>
-                    <h2 className="text-lg font-semibold text-[#0D0606] dark:text-[#D9E4D1]">Paper Settings</h2>
-                </div>
-
-                <div className="space-y-8">
-                    {/* Paper Size Settings */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
-                            <FileText className="w-3.5 h-3.5" /> Paper Size
-                        </label>
-                        <div className="relative">
-                            <select
-                                value={paperType}
-                                onChange={(e) => setPaperType(e.target.value)}
-                                className="w-full appearance-none bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 text-[#0D0606] dark:text-[#D9E4D1] text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#0D0606] dark:focus:ring-[#D9E4D1] transition-all cursor-pointer"
-                            >
-                                {paperTypes.map((type) => (
-                                    <option key={type.value} value={type.value}>
-                                        {type.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-                                <Layers className="w-4 h-4" />
+                <div className="relative p-2 bg-white/40 dark:bg-[#0D0606]/40 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] flex items-center gap-4">
+                    {loading ? (
+                        <div className="flex items-center gap-3 animate-pulse px-2">
+                            <div className="w-10 h-10 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-full" />
+                            <div className="space-y-2">
+                                <div className="h-3 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded w-20" />
                             </div>
                         </div>
-                    </div>
+                    ) : email ? (
+                        <>
+                            <div className="flex items-center gap-3 pl-2">
+                                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#0D0606]/20 dark:border-[#D9E4D1]/20 shadow-sm">
+                                    {photoURL ? (
+                                        <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center">
+                                            <User className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="hidden md:flex flex-col pr-2">
+                                    <h3 className="text-[#0D0606] dark:text-[#D9E4D1] font-semibold text-sm max-w-[120px] truncate">
+                                        {username || email.split('@')[0]}
+                                    </h3>
+                                    <p className="text-xs text-[#0D0606]/60 dark:text-[#D9E4D1]/60 max-w-[120px] truncate mt-0.5">
+                                        {email}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={async () => {
+                                    await signOut(Authentication);
+                                    window.location.reload();
+                                }}
+                                className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-medium text-xs transition-all border border-red-500/20 hover:border-red-500/30 active:scale-95"
+                            >
+                                Log Out
+                            </button>
+                        </>
+                    ) : (
+                        <div className="flex items-center gap-3 pl-2">
+                            <div className="w-10 h-10 rounded-full bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 flex items-center justify-center border border-[#0D0606]/10 dark:border-[#D9E4D1]/10">
+                                <User className="w-5 h-5 text-[#0D0606]/40 dark:text-[#D9E4D1]/40" />
+                            </div>
+                            <div className="hidden md:flex flex-col mr-2">
+                                <h3 className="text-[#0D0606] dark:text-[#D9E4D1] font-medium text-sm">Not Logged In</h3>
+                            </div>
+                            <button
+                                onClick={() => { setAuthModalType('login'); setIsAuthModalOpen(true); }}
+                                className="px-5 py-2.5 rounded-xl bg-[#0D0606] hover:bg-[#0D0606]/80 text-[#D9E4D1] dark:bg-[#D9E4D1] dark:hover:bg-[#D9E4D1]/80 dark:text-[#0D0606] font-medium text-xs transition-all shadow-md hover:shadow-lg active:scale-95"
+                            >
+                                Sign in with Google
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </motion.div>
 
-                    {/* Color Settings */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
-                            <Palette className="w-3.5 h-3.5" /> Paper Color
-                        </label>
-                        <div className="grid grid-cols-5 gap-2">
-                            {["#ffffff", "#f8f9fa", "#fdf6e3", "#fcfcfc", "#f0f4f8", "#000000"].map((color) => (
-                                <button
-                                    key={color}
-                                    onClick={() => setPaperColor(color)}
-                                    className={`w-full aspect-square rounded-full border-2 transition-transform duration-200 ${paperColor === color
-                                        ? "border-[#0D0606] dark:border-[#D9E4D1] scale-110 shadow-sm"
-                                        : "border-transparent border-[#0D0606]/20 dark:border-[#D9E4D1]/20 hover:scale-105"
-                                        }`}
-                                    style={{ backgroundColor: color }}
-                                />
+            {/* Bottom Bar - Paper Settings */}
+            <motion.div
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.1 }}
+                className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 w-[95%] md:w-[90%] max-w-6xl bg-white/40 dark:bg-[#0D0606]/40 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-3xl px-4 md:px-6 py-3 z-40 flex items-center md:justify-center gap-4 md:gap-6 overflow-x-auto scrollbar-hide shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]"
+            >
+                {/* 1. Paper Size */}
+                <div className="flex flex-col gap-1 min-w-[140px]">
+                    <label className="text-[10px] uppercase tracking-wider font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-1.5">
+                        <FileText className="w-3 h-3" /> Size
+                    </label>
+                    <div className="relative">
+                        <select
+                            value={paperType}
+                            onChange={(e) => setPaperType(e.target.value)}
+                            className="w-full appearance-none bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 text-[#0D0606] dark:text-[#D9E4D1] text-xs rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#0D0606] dark:focus:ring-[#D9E4D1] transition-all cursor-pointer"
+                        >
+                            {paperTypes.map((type) => (
+                                <option key={type.value} value={type.value}>{type.label}</option>
                             ))}
+                        </select>
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+                            <Layers className="w-3 h-3" />
                         </div>
                     </div>
+                </div>
 
-                    {/* Paper Texture/Style (Placeholder) */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
-                            <Layers className="w-3.5 h-3.5" /> Texture
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <button className="py-2.5 px-3 rounded-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] text-sm font-medium hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 transition-colors">
-                                Plain
-                            </button>
-                            <button className="py-2.5 px-3 rounded-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 text-sm font-medium hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 transition-colors text-zinc-500">
-                                Grid
-                            </button>
-                        </div>
-                    </div>
+                {/* Vertical Divider */}
+                <div className="w-[1px] h-10 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 shrink-0"></div>
 
-                    {/* Upload Image */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
-                            <Image className="w-3.5 h-3.5" /> Upload Image
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <input
-                                type="file"
-                                accept="image/png, image/jpeg, image/jpg, image/webp, image/heic"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                                className="hidden"
+                {/* 2. Paper Color */}
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[10px] uppercase tracking-wider font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-1.5">
+                        <Palette className="w-3 h-3" /> Color
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                        {["#ffffff", "#f8f9fa", "#fdf6e3", "#fcfcfc", "#f0f4f8", "#000000"].map((color) => (
+                            <button
+                                key={color}
+                                onClick={() => setPaperColor(color)}
+                                className={`w-7 h-7 rounded-full border-2 transition-transform duration-200 ${paperColor === color
+                                    ? "border-[#0D0606] dark:border-[#D9E4D1] scale-110 shadow-sm"
+                                    : "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 hover:scale-105"
+                                    }`}
+                                style={{ backgroundColor: color }}
                             />
-                            <button
-                                onClick={handleUploadClick}
-                                className="py-2.5 px-3 rounded-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] text-sm font-medium hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 transition-colors"
-                            >
-                                Upload Image
-                            </button>
-                        </div>
+                        ))}
                     </div>
+                </div>
 
-                    {/* Manajemen File Section */}
-                    <div className="space-y-3">
-                        <label className="text-xs uppercase tracking-wider font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
-                            <Image className="w-3.5 h-3.5 opacity-70" />
-                            Manajemen File
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                onClick={() => downloadPaper("docx")}
-                                disabled={!isDownload} // Tombol otomatis tidak bisa diklik jika isDownload false
-                                className={`
-                py-2.5 px-3 rounded-lg border text-sm font-medium transition-all duration-200
-                flex items-center justify-center gap-2
-                ${isDownload
-                                        ? "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 active:scale-95"
-                                        : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}
-            `}
-                            >
-                                <DockIcon className="w-4 h-4" />
-                                Download DOCX
-                            </button>
-                        </div>
+                {/* Vertical Divider */}
+                <div className="w-[1px] h-10 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 shrink-0"></div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                onClick={handleSaveToLibraDrive}
-                                disabled={!isDownload} // Tombol otomatis tidak bisa diklik jika isDownload false
-                                className={`
-                py-2.5 px-3 rounded-lg border text-sm font-medium transition-all duration-200
-                flex items-center justify-center gap-2
-                ${isDownload
-                                        ? "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 active:scale-95"
-                                        : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}
-            `}
-                            >
-                                <Server className="w-4 h-4" />
-                                Save to libra drive
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Print Action */}
-                    <div className="pt-4 border-t border-[#0D0606]/20 dark:border-[#D9E4D1]/20">
-                        <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#0D0606] hover:bg-[#0D0606]/80 text-[#D9E4D1] dark:bg-[#D9E4D1] dark:hover:bg-[#D9E4D1]/80 dark:text-[#0D0606] transition-all font-medium text-sm shadow-md hover:shadow-lg active:scale-95">
-                            <Printer className="w-4 h-4" />
-                            Print Paper
+                {/* 3. Texture */}
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[10px] uppercase tracking-wider font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-1.5">
+                        <Layers className="w-3 h-3" /> Texture
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                        <button className="py-2 px-3 rounded-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] text-xs font-medium hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 transition-colors">
+                            Plain
+                        </button>
+                        <button className="py-2 px-3 rounded-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 text-xs font-medium hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 transition-colors text-zinc-500">
+                            Grid
                         </button>
                     </div>
+                </div>
+
+                {/* Vertical Divider */}
+                <div className="w-[1px] h-10 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 shrink-0"></div>
+
+                {/* 4. Upload Image */}
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[10px] uppercase tracking-wider font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-1.5">
+                        <Image className="w-3 h-3" /> Image
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                        <input
+                            type="file"
+                            accept="image/png, image/jpeg, image/jpg, image/webp, image/heic"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            className="hidden"
+                        />
+                        <button
+                            onClick={handleUploadClick}
+                            className="py-2 px-3 rounded-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] text-xs font-medium hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 transition-colors flex items-center gap-2"
+                        >
+                            <Upload className="w-3 h-3" /> Upload
+                        </button>
+                    </div>
+                </div>
+
+                {/* Vertical Divider */}
+                <div className="w-[1px] h-10 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 shrink-0"></div>
+
+                {/* 5. File Management */}
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[10px] uppercase tracking-wider font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-1.5">
+                        <HardDrive className="w-3 h-3" /> Export
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={() => downloadPaper("docx")}
+                            disabled={!isDownload}
+                            className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all duration-200 flex items-center gap-2 ${isDownload ? "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 active:scale-95" : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}`}
+                        >
+                            <DockIcon className="w-3 h-3" /> DOCX
+                        </button>
+                        <button
+                            onClick={handleSaveToLibraDrive}
+                            disabled={!isDownload}
+                            className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all duration-200 flex items-center gap-2 ${isDownload ? "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 active:scale-95" : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}`}
+                        >
+                            <Server className="w-3 h-3" /> Drive
+                        </button>
+                    </div>
+                </div>
+
+                {/* Vertical Divider */}
+                <div className="w-[1px] h-10 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 shrink-0"></div>
+
+                {/* 6. Print Action */}
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[10px] uppercase tracking-wider font-semibold transparent opacity-0">Action</label>
+                    <button className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#0D0606] hover:bg-[#0D0606]/80 text-[#D9E4D1] dark:bg-[#D9E4D1] dark:hover:bg-[#D9E4D1]/80 dark:text-[#0D0606] transition-all font-medium text-xs shadow-md hover:shadow-lg active:scale-95">
+                        <Printer className="w-3.5 h-3.5" />
+                        Print
+                    </button>
                 </div>
             </motion.div>
 
