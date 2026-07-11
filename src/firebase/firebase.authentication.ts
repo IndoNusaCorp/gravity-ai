@@ -12,8 +12,23 @@ export async function SignInAndRegisterWithGoogleSystem() {
 
         //Mengembalikan fungsi
         return waitresponfromsystemsigninwithgoogle;
-    } catch (error) {
-        console.error("Sign in with google system error, please try again", error);
-        throw error;
+    } catch (error: any) {
+        // Detailed error logging untuk debugging
+        console.error("=== Firebase Auth Error Details ===");
+        console.error("Error Code:", error?.code);
+        console.error("Error Message:", error?.message);
+        console.error("Error Custom Data:", error?.customData);
+        console.error("Full Error Object:", error);
+        console.error("===================================");
+        
+        // Re-throw dengan pesan yang lebih informatif
+        const errorMessage = error?.code 
+            ? `Firebase: Error (${error.code}).`
+            : error?.message || "Unknown authentication error";
+        
+        const enhancedError = new Error(errorMessage);
+        (enhancedError as any).code = error?.code;
+        (enhancedError as any).originalError = error;
+        throw enhancedError;
     }
 }
