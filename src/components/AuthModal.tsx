@@ -24,51 +24,28 @@ export function AuthModal({ isOpen, onClose, initialType }: AuthModalProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        //Logika untuk menggunakan sistem Sign in with google (menggunakan if else)
-        //1. Register menggunakan Sign in with google
-        if (Register) {
-            setRegister(true);
-            
-            //Pesan untuk menunggu alias loading 
-            setLoading(true);
-            console.log("Loading...")
-
-            //Menunggu hasil dari SignInWithGoogleSystem
-            const waitforresultforregister = await SignInAndRegisterWithGoogleSystem();
-            
-            setLoading(false);
-
-            // Jika proses login/register berhasil, tutup otomatis modal popup ini
-            if (waitforresultforregister) {
-                onClose();
-            }
-
-            //Mengembalikan fungsi
-            return Register;
-        }
-
-         //2. Login menggunakan Sign in with google
-        if (Login) {
-            setLogin(true);
-            
-            //Pesan untuk menunggu alias loading 
-            setLoading(true);
-            console.log("Loading...")
-
-            //Menunggu hasil dari SignInWithGoogleSystem
-            const waitforresultforloading = await SignInAndRegisterWithGoogleSystem();
-            
-            setLoading(false);
-
-            // Jika proses login berhasil, tutup otomatis modal popup ini
-            if (waitforresultforloading) {
-                onClose();
-            }
-
-            //Mengembalikan fungsi
-            return Login;
-        }
+        // Reset state error sebelum mulai
+        setError("");
         
+        // Pesan untuk menunggu alias loading 
+        setLoading(true);
+        console.log("Loading...");
+
+        try {
+            // Menunggu hasil dari SignInWithGoogleSystem
+            const result = await SignInAndRegisterWithGoogleSystem();
+            
+            // Jika proses login/register berhasil, tutup otomatis modal popup ini
+            if (result) {
+                onClose();
+            }
+        } catch (err: any) {
+            console.error("Error during authentication:", err);
+            // Tampilkan pesan error ke pengguna
+            setError(err.message || "Gagal masuk dengan Google. Silakan coba lagi.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

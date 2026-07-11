@@ -13,6 +13,7 @@ export async function SignInAndRegisterWithGoogleSystem() {
         //Mengembalikan fungsi
         return waitresponfromsystemsigninwithgoogle;
     } catch (error) {
-        console.log("Sign in with google system error, please try again");
+        console.error("Sign in with google system error, please try again", error);
+        throw error;
     }
 }
