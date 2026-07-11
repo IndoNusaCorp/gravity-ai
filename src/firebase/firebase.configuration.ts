@@ -54,7 +54,7 @@ if (typeof window !== "undefined") {
   }
 }
 
-// export const storage = getStorage(app);
+export const connecttolibradrivestorage = getStorage(app);
 export const Authentication = getAuth(app);
 export const signinwithgoogle = new GoogleAuthProvider();
 export const signinwithpopup = () => signInWithPopup(Authentication, signinwithgoogle);

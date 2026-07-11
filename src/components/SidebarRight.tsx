@@ -1,11 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Settings, Printer, Palette, Layers, FileText, Image, User } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Settings, Printer, Palette, Layers, FileText, Image, User, DockIcon, HardDrive, Server, X, CheckCircle, AlertCircle, Loader2, FolderOpen } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Authentication } from "../firebase/firebase.configuration";
 import { AuthModal, AuthType } from "./AuthModal";
+
 
 interface SidebarRightProps {
     onImageUpload?: (src: string) => void;
@@ -25,12 +26,115 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
     const [password, getpassword] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
+    //state untuk save file ke libra drive
+    const [SaveFileToLibraDrive, setSaveFileToLibraDrive] = useState(true);
+    
+    //state untuk delete file dari libra drive
+    const [DeleteFileFromLibraDrive, setDeleteFileFromLibraDrive] = useState(true);
+
+    // State untuk modal Save to LibraDrive
+    const [isLibraDriveModalOpen, setIsLibraDriveModalOpen] = useState(false);
+    const [libraDriveFolderName, setLibraDriveFolderName] = useState("");
+    const [libraDriveFileName, setLibraDriveFileName] = useState("");
+    const [libraDriveExtension, setLibraDriveExtension] = useState<"docx" | "pdf">("docx");
+    const [libraDriveSaving, setLibraDriveSaving] = useState(false);
+    const [libraDriveProgress, setLibraDriveProgress] = useState(0);
+    const [libraDriveStatus, setLibraDriveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+
     // State untuk menyimpan warna kertas
     const [paperColor, setPaperColor] = useState("#ffffff");
     // State untuk menyimpan jenis/ukuran kertas (default A4)
     const [paperType, setPaperType] = useState("a4");
 
     const [uploadImage, setUploadImage] = useState<string | null>(null);
+
+    //Logika if else untuk simpan file ke libradrive (Front End)
+    const handleSaveToLibraDrive = () => {
+        // Reset modal state sebelum membuka
+        setLibraDriveFolderName("");
+        setLibraDriveFileName("");
+        setLibraDriveExtension("docx");
+        setLibraDriveProgress(0);
+        setLibraDriveStatus("idle");
+        setLibraDriveSaving(false);
+        setIsLibraDriveModalOpen(true);
+    }
+
+    // Handler untuk proses simpan ke LibraDrive dari modal
+    const handleConfirmSaveToLibraDrive = async () => {
+        if (!libraDriveFileName.trim()) return;
+
+        setLibraDriveSaving(true);
+        setLibraDriveStatus("saving");
+        setLibraDriveProgress(0);
+
+        try {
+            // Simulasi progress upload
+            const progressInterval = setInterval(() => {
+                setLibraDriveProgress((prev) => {
+                    if (prev >= 90) {
+                        clearInterval(progressInterval);
+                        return 90;
+                    }
+                    return prev + Math.random() * 15 + 5;
+                });
+            }, 300);
+
+            // Kumpulkan konten dari editor untuk membuat file
+            const pages: HTMLElement[] = [];
+            let index = 0;
+            let p = document.getElementById(`main-editor-${index}`);
+            while (p) {
+                pages.push(p);
+                index++;
+                p = document.getElementById(`main-editor-${index}`);
+            }
+
+            // Buat Blob file sesuai ekstensi yang dipilih
+            const fullFileName = `${libraDriveFileName.trim()}.${libraDriveExtension}`;
+            let fileBlob: Blob;
+
+            if (libraDriveExtension === "docx") {
+                let htmlContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>GravityAI Export</title></head><body>`;
+                pages.forEach((pageDom) => {
+                    htmlContent += pageDom.innerHTML;
+                    htmlContent += "<br clear=all style='mso-special-character:line-break;page-break-before:always'>";
+                });
+                htmlContent += "</body></html>";
+                fileBlob = new Blob(['\ufeff', htmlContent], { type: "application/msword" });
+            } else {
+                // Untuk PDF, buat simple blob sebagai placeholder
+                let htmlContent = "";
+                pages.forEach((pageDom) => {
+                    htmlContent += pageDom.innerHTML;
+                });
+                fileBlob = new Blob([htmlContent], { type: "application/pdf" });
+            }
+
+            const file = new File([fileBlob], fullFileName);
+            const folderName = libraDriveFolderName.trim() || "Recent Documents";
+
+            // Panggil fungsi SaveFileToLibraDrive dari firebase
+            const { SaveFileToLibraDrive: SaveFn } = await import("@/firebase/storage.firebase");
+            await SaveFn(file, folderName);
+
+            clearInterval(progressInterval);
+            setLibraDriveProgress(100);
+            setLibraDriveStatus("success");
+            setLibraDriveSaving(false);
+
+            // Auto close modal setelah 2 detik jika sukses
+            setTimeout(() => {
+                setIsLibraDriveModalOpen(false);
+                setLibraDriveStatus("idle");
+            }, 2500);
+        } catch (error) {
+            console.error("Error saving to LibraDrive:", error);
+            setLibraDriveProgress(0);
+            setLibraDriveStatus("error");
+            setLibraDriveSaving(false);
+        }
+    }
 
     // Daftar semua jenis/ukuran kertas yang tersedia (ada 30 jenis) beserta ukurannya dalam piksel
     const paperTypes = [
@@ -421,13 +525,12 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                         </div>
                     </div>
 
-                    {/* Download File Section */}
+                    {/* Manajemen File Section */}
                     <div className="space-y-3">
                         <label className="text-xs uppercase tracking-wider font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
                             <Image className="w-3.5 h-3.5 opacity-70" />
                             Manajemen File
                         </label>
-
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 onClick={() => downloadPaper("docx")}
@@ -440,8 +543,25 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                                         : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}
             `}
                             >
-                                <Image className="w-4 h-4" />
+                                <DockIcon className="w-4 h-4" />
                                 Download DOCX
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={handleSaveToLibraDrive}
+                                disabled={!isDownload} // Tombol otomatis tidak bisa diklik jika isDownload false
+                                className={`
+                py-2.5 px-3 rounded-lg border text-sm font-medium transition-all duration-200
+                flex items-center justify-center gap-2
+                ${isDownload
+                                        ? "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 active:scale-95"
+                                        : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}
+            `}
+                            >
+                                <Server className="w-4 h-4" />
+                                Save to libra drive
                             </button>
                         </div>
                     </div>
@@ -461,6 +581,243 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                 onClose={() => setIsAuthModalOpen(false)}
                 initialType={authModalType}
             />
+
+            {/* Modal Save to LibraDrive */}
+            <AnimatePresence>
+                {isLibraDriveModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center"
+                        onClick={(e) => {
+                            if (e.target === e.currentTarget && !libraDriveSaving) {
+                                setIsLibraDriveModalOpen(false);
+                                setLibraDriveStatus("idle");
+                            }
+                        }}
+                    >
+                        {/* Backdrop */}
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+                        {/* Modal Content */}
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                            className="relative w-full max-w-md mx-4 bg-[#D9E4D1] dark:bg-[#0D0606] border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 rounded-2xl shadow-2xl overflow-hidden"
+                        >
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-6 pt-6 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center border border-[#0D0606]/20 dark:border-[#D9E4D1]/20">
+                                        <Server className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-[#0D0606] dark:text-[#D9E4D1]">Save to LibraDrive</h3>
+                                        <p className="text-xs text-[#0D0606]/60 dark:text-[#D9E4D1]/60">Simpan dokumen ke cloud storage</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (!libraDriveSaving) {
+                                            setIsLibraDriveModalOpen(false);
+                                            setLibraDriveStatus("idle");
+                                        }
+                                    }}
+                                    disabled={libraDriveSaving}
+                                    className="w-8 h-8 rounded-lg hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 flex items-center justify-center transition-colors disabled:opacity-50"
+                                >
+                                    <X className="w-4 h-4 text-[#0D0606] dark:text-[#D9E4D1]" />
+                                </button>
+                            </div>
+
+                            {/* Body */}
+                            <div className="px-6 pb-6 space-y-5">
+                                {/* Status: Saving / Success / Error */}
+                                {libraDriveStatus === "saving" && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-4"
+                                    >
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Menyimpan ke LibraDrive...</span>
+                                        </div>
+                                        <div className="w-full h-2 bg-blue-500/20 rounded-full overflow-hidden">
+                                            <motion.div
+                                                className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full"
+                                                initial={{ width: "0%" }}
+                                                animate={{ width: `${Math.min(libraDriveProgress, 100)}%` }}
+                                                transition={{ duration: 0.3, ease: "easeOut" }}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-blue-500/70 mt-2">{Math.round(Math.min(libraDriveProgress, 100))}% selesai</p>
+                                    </motion.div>
+                                )}
+
+                                {libraDriveStatus === "success" && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4 flex items-center gap-3"
+                                    >
+                                        <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                        <div>
+                                            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Berhasil disimpan!</p>
+                                            <p className="text-xs text-emerald-500/70 mt-0.5">File telah tersimpan di LibraDrive</p>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {libraDriveStatus === "error" && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="rounded-xl bg-red-500/10 border border-red-500/20 p-4 flex items-center gap-3"
+                                    >
+                                        <AlertCircle className="w-5 h-5 text-red-500" />
+                                        <div>
+                                            <p className="text-sm font-medium text-red-600 dark:text-red-400">Gagal menyimpan!</p>
+                                            <p className="text-xs text-red-500/70 mt-0.5">Terjadi kesalahan, silakan coba lagi</p>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* Form Fields (hidden during saving/success) */}
+                                {libraDriveStatus !== "saving" && libraDriveStatus !== "success" && (
+                                    <>
+                                        {/* Nama Folder */}
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
+                                                <FolderOpen className="w-3.5 h-3.5" />
+                                                Nama Folder
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={libraDriveFolderName}
+                                                onChange={(e) => setLibraDriveFolderName(e.target.value)}
+                                                placeholder="Recent Documents"
+                                                className="w-full bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 text-[#0D0606] dark:text-[#D9E4D1] text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#0D0606]/30 dark:focus:ring-[#D9E4D1]/30 transition-all placeholder:text-[#0D0606]/30 dark:placeholder:text-[#D9E4D1]/30"
+                                            />
+                                            <p className="text-xs text-[#0D0606]/40 dark:text-[#D9E4D1]/40">Kosongkan untuk menyimpan di "Recent Documents"</p>
+                                        </div>
+
+                                        {/* Nama File */}
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
+                                                <FileText className="w-3.5 h-3.5" />
+                                                Nama File
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={libraDriveFileName}
+                                                onChange={(e) => setLibraDriveFileName(e.target.value)}
+                                                placeholder="Masukkan nama file..."
+                                                className="w-full bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 text-[#0D0606] dark:text-[#D9E4D1] text-sm rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#0D0606]/30 dark:focus:ring-[#D9E4D1]/30 transition-all placeholder:text-[#0D0606]/30 dark:placeholder:text-[#D9E4D1]/30"
+                                            />
+                                        </div>
+
+                                        {/* Ekstensi File */}
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-2">
+                                                <Layers className="w-3.5 h-3.5" />
+                                                Ekstensi File
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    onClick={() => setLibraDriveExtension("docx")}
+                                                    className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+                                                        libraDriveExtension === "docx"
+                                                            ? "border-[#0D0606] dark:border-[#D9E4D1] bg-[#0D0606] dark:bg-[#D9E4D1] text-[#D9E4D1] dark:text-[#0D0606] shadow-md"
+                                                            : "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/15"
+                                                    }`}
+                                                >
+                                                    <DockIcon className="w-4 h-4" />
+                                                    .docx
+                                                </button>
+                                                <button
+                                                    onClick={() => setLibraDriveExtension("pdf")}
+                                                    className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
+                                                        libraDriveExtension === "pdf"
+                                                            ? "border-[#0D0606] dark:border-[#D9E4D1] bg-[#0D0606] dark:bg-[#D9E4D1] text-[#D9E4D1] dark:text-[#0D0606] shadow-md"
+                                                            : "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/15"
+                                                    }`}
+                                                >
+                                                    <FileText className="w-4 h-4" />
+                                                    .pdf
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Preview nama file */}
+                                        {libraDriveFileName.trim() && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: "auto" }}
+                                                className="rounded-xl bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 px-4 py-3"
+                                            >
+                                                <p className="text-xs text-[#0D0606]/50 dark:text-[#D9E4D1]/50 mb-1">Preview</p>
+                                                <p className="text-sm font-mono text-[#0D0606] dark:text-[#D9E4D1] truncate">
+                                                    📁 {libraDriveFolderName.trim() || "Recent Documents"} / {libraDriveFileName.trim()}.{libraDriveExtension}
+                                                </p>
+                                            </motion.div>
+                                        )}
+
+                                        {/* Action Buttons */}
+                                        <div className="flex gap-3 pt-2">
+                                            <button
+                                                onClick={() => {
+                                                    setIsLibraDriveModalOpen(false);
+                                                    setLibraDriveStatus("idle");
+                                                }}
+                                                className="flex-1 py-3 rounded-xl border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 transition-all active:scale-95"
+                                            >
+                                                Batal
+                                            </button>
+                                            <button
+                                                onClick={handleConfirmSaveToLibraDrive}
+                                                disabled={!libraDriveFileName.trim()}
+                                                className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all active:scale-95 flex items-center justify-center gap-2 ${
+                                                    libraDriveFileName.trim()
+                                                        ? "bg-[#0D0606] dark:bg-[#D9E4D1] text-[#D9E4D1] dark:text-[#0D0606] hover:opacity-90 shadow-md hover:shadow-lg"
+                                                        : "bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 text-[#0D0606]/40 dark:text-[#D9E4D1]/40 cursor-not-allowed"
+                                                }`}
+                                            >
+                                                <Server className="w-4 h-4" />
+                                                Simpan
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Tombol tutup saat error */}
+                                {libraDriveStatus === "error" && (
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setLibraDriveStatus("idle")}
+                                            className="flex-1 py-3 rounded-xl border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 transition-all active:scale-95"
+                                        >
+                                            Coba Lagi
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setIsLibraDriveModalOpen(false);
+                                                setLibraDriveStatus("idle");
+                                            }}
+                                            className="flex-1 py-3 rounded-xl bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-sm font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:bg-[#0D0606]/15 dark:hover:bg-[#D9E4D1]/15 transition-all active:scale-95"
+                                        >
+                                            Tutup
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </>
     );
 }
