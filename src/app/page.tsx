@@ -602,14 +602,14 @@ export default function Home() {
 
     try {
       const recentHistory = chatHistory.slice(-6).map(msg => ({
-        role: msg.role === "user" ? "user" : "assistant",
+        role: msg.role === "user" ? "user" : "system",
         content: msg.content
       }));
 
       const response = await fetch("/api/LibraAI", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: topic, type: docType, history: recentHistory }),
+        body: JSON.stringify({ message: topic, type: docType, history: recentHistory }),
       });
 
       if (!response.ok) throw new Error("Failed to fetch from API");
