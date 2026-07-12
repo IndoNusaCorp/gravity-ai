@@ -552,49 +552,39 @@ export default function Home() {
     }
   }, [pageNumber, convertMarkdownToHtml, splitMarkdownIntoSections]);
 
-  // Fungsi utama untuk mengirim pesan ke AI
+  // Disini mencoba untuk koneksikan sistem ke backend
   const sendToAI = async (messageText: string) => {
-    if (!messageText.trim() || isLoading) return;
+      if (!messageText.trim() || isLoading) return;
 
-    const newUserMessage = { role: "user" as const, content: messageText };
-    setChatHistory(prev => [...prev, newUserMessage]);
+      const newUserMessage = { role: "user" as const, content: messageText };
+      setChatHistory(prev => [...prev, newUserMessage]);
+      setIsChatActive(true);
+      setIsLoading(true);
+      setInputValue("");
 
-    setInputValue("");
-    setIsChatActive(true);
-    setIsLoading(true);
+      try {
+         //Menunggu respon dari backend
+         const connectfrombackend = await fetch("/api/LibraAI", {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({message: messageText}),
+         });
 
-    try {
-      // Extract recent history to send to backend for context memory
-      // We send up to the last 6 messages (excluding the one we just added)
-      const recentHistory = chatHistory.slice(-6).map(msg => ({
-        role: msg.role === "user" ? "user" : "assistant",
-        content: msg.content
-      }));
+         //Menunggu Response dari backend
+         const waitresponfrombackend = await connectfrombackend.json();
 
-      // Create a prompt from the latest message and attach history context
-      const response = await fetch("/api/LibraAI", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt: messageText, history: recentHistory }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch from API");
+         //Mendapatkan Reply dari AI
+         const reply = waitresponfrombackend.reply || "Pesan diterima.";
+         
+         //Menambahkan Reply ke chat history
+         setChatHistory(prev => [...prev, { role: "friend", content: reply }]);
+      } catch {
+         //Pesan untuk kalau AI masih belum terkoneksi dari backend ke front end
+         console.log("LibraAI belum terkoneksi");
+         setChatHistory(prev => [...prev, { role: "friend", content: "Maaf, saya sedang kesulitan terhubung dengan LibraAI saat ini." }]);
+      } finally {
+         setIsLoading(false);
       }
-
-      const data = await response.json();
-      // Mengambil balasan dari AI
-      const reply = data.data?.message || data.reply || data.text || data.response || (typeof data === 'string' ? data : "Pesan berhasil diterima.");
-
-      setChatHistory(prev => [...prev, { role: "friend", content: reply }]);
-    } catch (error) {
-      console.error("Error fetching from API:", error);
-      setChatHistory(prev => [...prev, { role: "friend", content: "Maaf, saya sedang kesulitan terhubung dengan LibraAI saat ini." }]);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   // Fungsi khusus untuk Quick Action: kirim ke AI dengan tipe paper, lalu insert ke paper
