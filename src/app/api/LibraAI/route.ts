@@ -70,15 +70,51 @@ export async function POST(request: NextRequest) {
 
         //Konfigurasi Model
         const ConfigurationModel = await ConfigurationSystem.chat.completions.create({
-            model: "deepseek-v4-flash",
+            model: "deepseek-v4-pro",
             messages,
-        });
-        
-        //Mengambil respon dari model
-        const reply = ConfigurationModel.choices[0]?.message?.content;
+            thinking: {"type": "enabled"},
+            reasoning_effort: "medium",
+            stream: true
+        } as any);
 
-        //Mengembalikan respon dalam format JSON
-        return NextResponse.json({ reply });
+        // Menggunakan ReadableStream untuk mengirim SSE (Server-Sent Events) ke frontend
+        const encoder = new TextEncoder();
+        const readable = new ReadableStream({
+            //Memulai Server Sent Events (SSE) dan mengirimkannya ke frontend
+            async start(controller) {
+                try {
+                    //Loop untuk menerima chunk dari model AI (bagian-bagian)
+                    for await (const chunk of ConfigurationModel as any) {
+                        const choice = chunk.choices?.[0];
+                        if (!choice) continue;
+
+                        const delta = choice.delta as any;
+                        if (delta?.reasoning_content) {
+                            // Kirim potongan pemikiran (reasoning)
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'reasoning', content: delta.reasoning_content })}\n\n`));
+                        }
+                        if (delta?.content) {
+                            // Kirim potongan konten (jawaban)
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: delta.content })}\n\n`));
+                        }
+                    }
+                    // Kirim sinyal selesai
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
+                    controller.close();
+                } catch (error) {
+                    controller.error(error);
+                }
+            }
+        });
+
+        // Mengembalikan response stream
+        return new Response(readable, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+            },
+        });
     } catch (error) {
         //Pesan error di console
         console.error("Sistem LibraAI gagal merespon", error);

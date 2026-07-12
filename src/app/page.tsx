@@ -16,7 +16,7 @@ export default function Home() {
   // State untuk menyimpan teks yang diketik pengguna di kolom pencarian/input
   const [inputValue, setInputValue] = useState("");
   // State untuk menyimpan riwayat obrolan (chat history)
-  const [chatHistory, setChatHistory] = useState<{ role: "user" | "friend", content: string }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ role: "user" | "friend", content: string, reasoning?: string }[]>([]);
   // State loading AI
   const [isLoading, setIsLoading] = useState(false);
 
@@ -563,21 +563,55 @@ export default function Home() {
       setInputValue("");
 
       try {
-         //Menunggu respon dari backend
+         //Menunggu respon dari backend (Streaming)
          const connectfrombackend = await fetch("/api/LibraAI", {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({message: messageText}),
          });
 
-         //Menunggu Response dari backend
-         const waitresponfrombackend = await connectfrombackend.json();
+         if (!connectfrombackend.body) throw new Error("No response body");
 
-         //Mendapatkan Reply dari AI
-         const reply = waitresponfrombackend.reply || "Pesan diterima.";
-         
-         //Menambahkan Reply ke chat history
-         setChatHistory(prev => [...prev, { role: "friend", content: reply }]);
+         const reader = connectfrombackend.body.getReader();
+         const decoder = new TextDecoder();
+         let done = false;
+
+         let currentReasoning = "";
+         let currentContent = "";
+
+         // Inisialisasi bubble AI kosong
+         setChatHistory(prev => [...prev, { role: "friend", content: "", reasoning: "" }]);
+
+         while (!done) {
+             const { value, done: readerDone } = await reader.read();
+             done = readerDone;
+             if (value) {
+                 const chunkStr = decoder.decode(value, { stream: true });
+                 const lines = chunkStr.split('\n');
+                 for (const line of lines) {
+                     if (line.startsWith('data: ')) {
+                         try {
+                             const data = JSON.parse(line.slice(6));
+                             if (data.type === 'reasoning') {
+                                 currentReasoning += data.content;
+                             } else if (data.type === 'content') {
+                                 currentContent += data.content;
+                             }
+                             
+                             setChatHistory(prev => {
+                                 const newHistory = [...prev];
+                                 newHistory[newHistory.length - 1] = { 
+                                     ...newHistory[newHistory.length - 1], 
+                                     content: currentContent,
+                                     reasoning: currentReasoning
+                                 };
+                                 return newHistory;
+                             });
+                         } catch (e) {}
+                     }
+                 }
+             }
+         }
       } catch {
          //Pesan untuk kalau AI masih belum terkoneksi dari backend ke front end
          console.log("LibraAI belum terkoneksi");
@@ -612,12 +646,49 @@ export default function Home() {
         body: JSON.stringify({ message: topic, type: docType, history: recentHistory }),
       });
 
-      if (!response.ok) throw new Error("Failed to fetch from API");
+      if (!response.ok || !response.body) throw new Error("Failed to fetch from API");
 
-      const data = await response.json();
-      const reply = data.data?.message || data.reply || data.text || data.response || (typeof data === 'string' ? data : "Pesan berhasil diterima.");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
 
-      setChatHistory(prev => [...prev, { role: "friend", content: reply }]);
+      let currentReasoning = "";
+      let currentContent = "";
+
+      setChatHistory(prev => [...prev, { role: "friend", content: "", reasoning: "" }]);
+
+      while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) {
+              const chunkStr = decoder.decode(value, { stream: true });
+              const lines = chunkStr.split('\n');
+              for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                      try {
+                          const data = JSON.parse(line.slice(6));
+                          if (data.type === 'reasoning') {
+                              currentReasoning += data.content;
+                          } else if (data.type === 'content') {
+                              currentContent += data.content;
+                          }
+                          
+                          setChatHistory(prev => {
+                              const newHistory = [...prev];
+                              newHistory[newHistory.length - 1] = { 
+                                  ...newHistory[newHistory.length - 1], 
+                                  content: currentContent,
+                                  reasoning: currentReasoning
+                              };
+                              return newHistory;
+                          });
+                      } catch (e) {}
+                  }
+              }
+          }
+      }
+
+      let reply = currentContent || "Pesan berhasil diterima.";
 
       // Bersihkan teks pembuka/basa-basi sebelum heading markdown pertama
       // Contoh: "Tentu, ini draf artikel... \n\n# Judul" → "# Judul"
@@ -909,6 +980,15 @@ export default function Home() {
                   {chatHistory.map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start w-full'}`}>
                       <div className={`${msg.role === 'user' ? 'bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-tr-sm max-w-[85%]' : 'bg-[#0D0606] dark:bg-[#D9E4D1] rounded-tl-sm w-fit max-w-[95%] text-[#D9E4D1] dark:text-[#0D0606]'} px-5 py-4 rounded-2xl shadow-sm overflow-x-auto`}>
+                        {msg.reasoning && (
+                          <div className="mb-3 p-3 bg-white/5 dark:bg-black/10 rounded-xl text-xs italic opacity-80 whitespace-pre-wrap border border-white/10 dark:border-black/5">
+                            <div className="flex items-center gap-1.5 mb-1.5 font-semibold opacity-70">
+                                <Network className="w-3.5 h-3.5" />
+                                <span>Thinking...</span>
+                            </div>
+                            <Markdown>{msg.reasoning}</Markdown>
+                          </div>
+                        )}
                         <div className={`font-medium leading-relaxed text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'text-[#0D0606] dark:text-[#D9E4D1]' : ''}`}>
                           {msg.role === 'user' ? msg.content : <Markdown>{msg.content}</Markdown>}
                         </div>
