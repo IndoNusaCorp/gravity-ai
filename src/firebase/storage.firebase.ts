@@ -50,7 +50,7 @@ export async function SaveFileToLibraDrive(file: File, collectionName: string) {
         const storageRef = await ConfigurationSaveFileToLibraDrive(file, collectionName);
 
         //Sistem terpenting untuk simpan file ke libradrive via uploadBytes
-        const SaveFileResult = await uploadBytes(storageRef, file);
+        const SaveFileResult = await uploadBytes(storageRef, file, {contentType: file.type});
 
         console.log("File berhasil diupload ke LibraDrive:", SaveFileResult.metadata.fullPath);
 

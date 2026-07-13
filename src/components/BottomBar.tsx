@@ -7,6 +7,11 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Authentication } from "../firebase/firebase.configuration";
 import { AuthModal, AuthType } from "./AuthModal";
 
+// Library untuk generate file DOCX & PDF yang valid
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+
 
 interface SidebarRightProps {
     onImageUpload?: (src: string) => void;
@@ -90,28 +95,164 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                 p = document.getElementById(`main-editor-${index}`);
             }
 
-            // Buat Blob file sesuai ekstensi yang dipilih
+            // Buat file DOCX atau PDF yang valid sesuai ekstensi yang dipilih
             const fullFileName = `${libraDriveFileName.trim()}.${libraDriveExtension}`;
             let fileBlob: Blob;
 
             if (libraDriveExtension === "docx") {
-                let htmlContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>GravityAI Export</title></head><body>`;
+                // ============================================================
+                // DOCX: Menggunakan library "docx" untuk membuat file .docx yang valid
+                // File .docx asli adalah arsip ZIP berisi XML, bukan HTML biasa
+                // ============================================================
+
+                // Fungsi helper: Konversi HTML node menjadi array Paragraph untuk docx
+                // Membaca setiap elemen HTML (h1, h2, p, dll) dan mengubahnya jadi format docx
+                const htmlToParagraphs = (element: HTMLElement): Paragraph[] => {
+                    const paragraphs: Paragraph[] = [];
+                    const children = element.childNodes;
+
+                    children.forEach((node) => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            // Text biasa → Paragraph biasa
+                            const text = node.textContent?.trim();
+                            if (text) {
+                                paragraphs.push(new Paragraph({
+                                    children: [new TextRun({ text })],
+                                }));
+                            }
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                            const el = node as HTMLElement;
+                            const tagName = el.tagName.toLowerCase();
+
+                            // Deteksi heading (h1, h2, h3, dll)
+                            if (tagName === "h1") {
+                                paragraphs.push(new Paragraph({
+                                    children: [new TextRun({ text: el.textContent || "", bold: true, size: 32 })],
+                                    heading: HeadingLevel.HEADING_1,
+                                    alignment: AlignmentType.CENTER,
+                                }));
+                            } else if (tagName === "h2") {
+                                paragraphs.push(new Paragraph({
+                                    children: [new TextRun({ text: el.textContent || "", bold: true, size: 28 })],
+                                    heading: HeadingLevel.HEADING_2,
+                                }));
+                            } else if (tagName === "h3") {
+                                paragraphs.push(new Paragraph({
+                                    children: [new TextRun({ text: el.textContent || "", bold: true, size: 24 })],
+                                    heading: HeadingLevel.HEADING_3,
+                                }));
+                            } else if (tagName === "ul" || tagName === "ol") {
+                                // List items → Paragraph per item dengan bullet/number
+                                const items = el.querySelectorAll("li");
+                                items.forEach((li, idx) => {
+                                    const prefix = tagName === "ol" ? `${idx + 1}. ` : "• ";
+                                    paragraphs.push(new Paragraph({
+                                        children: [new TextRun({ text: prefix + (li.textContent || "") })],
+                                        spacing: { before: 100 },
+                                    }));
+                                });
+                            } else if (tagName === "br") {
+                                // Line break → Paragraph kosong
+                                paragraphs.push(new Paragraph({ children: [] }));
+                            } else if (tagName === "strong" || tagName === "b") {
+                                paragraphs.push(new Paragraph({
+                                    children: [new TextRun({ text: el.textContent || "", bold: true })],
+                                }));
+                            } else if (tagName === "em" || tagName === "i") {
+                                paragraphs.push(new Paragraph({
+                                    children: [new TextRun({ text: el.textContent || "", italics: true })],
+                                }));
+                            } else {
+                                // Elemen lain (p, div, span, dll) → ambil text content
+                                // Jika punya child elements, proses rekursif
+                                if (el.children.length > 0) {
+                                    paragraphs.push(...htmlToParagraphs(el));
+                                } else {
+                                    const text = el.textContent?.trim();
+                                    if (text) {
+                                        paragraphs.push(new Paragraph({
+                                            children: [new TextRun({ text })],
+                                            spacing: { after: 200 },
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    return paragraphs;
+                };
+
+                // Kumpulkan semua paragraphs dari semua halaman editor
+                const allParagraphs: Paragraph[] = [];
                 pages.forEach((pageDom) => {
-                    htmlContent += pageDom.innerHTML;
-                    htmlContent += "<br clear=all style='mso-special-character:line-break;page-break-before:always'>";
+                    allParagraphs.push(...htmlToParagraphs(pageDom));
                 });
-                htmlContent += "</body></html>";
-                fileBlob = new Blob(['\ufeff', htmlContent], { type: "application/msword" });
+
+                // Buat Document docx yang valid menggunakan library "docx"
+                const doc = new Document({
+                    sections: [{
+                        properties: {},
+                        children: allParagraphs,
+                    }],
+                });
+
+                // Packer.toBlob() menghasilkan file .docx yang valid (ZIP berisi XML)
+                fileBlob = await Packer.toBlob(doc);
+
             } else {
-                // Untuk PDF, buat simple blob sebagai placeholder
-                let htmlContent = "";
-                pages.forEach((pageDom) => {
-                    htmlContent += pageDom.innerHTML;
-                });
-                fileBlob = new Blob([htmlContent], { type: "application/pdf" });
+                // ============================================================
+                // PDF: Menggunakan jsPDF + html2canvas untuk membuat file .pdf yang valid
+                // html2canvas menangkap tampilan visual editor sebagai gambar,
+                // lalu jsPDF memasukkannya ke dalam format PDF yang benar
+                // ============================================================
+                const pdf = new jsPDF("p", "mm", "a4");
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const margin = 10; // margin 10mm di setiap sisi
+
+                for (let i = 0; i < pages.length; i++) {
+                    // Tangkap tampilan visual halaman editor sebagai canvas/gambar
+                    const canvas = await html2canvas(pages[i], {
+                        scale: 2, // Resolusi 2x untuk kualitas lebih baik
+                        useCORS: true, // Izinkan gambar cross-origin
+                        backgroundColor: "#ffffff",
+                    });
+
+                    // Konversi canvas ke gambar PNG
+                    const imgData = canvas.toDataURL("image/png");
+
+                    // Hitung dimensi gambar agar pas di halaman PDF dengan margin
+                    const availableWidth = pdfWidth - (margin * 2);
+                    const availableHeight = pdfHeight - (margin * 2);
+                    const imgRatio = canvas.height / canvas.width;
+                    let imgWidth = availableWidth;
+                    let imgHeight = imgWidth * imgRatio;
+
+                    // Jika tinggi gambar melebihi halaman, sesuaikan
+                    if (imgHeight > availableHeight) {
+                        imgHeight = availableHeight;
+                        imgWidth = imgHeight / imgRatio;
+                    }
+
+                    // Tambahkan halaman baru untuk halaman ke-2 dan seterusnya
+                    if (i > 0) {
+                        pdf.addPage();
+                    }
+
+                    // Masukkan gambar ke halaman PDF
+                    pdf.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
+                }
+
+                // Output PDF sebagai Blob yang valid
+                fileBlob = pdf.output("blob");
             }
 
-            const file = new File([fileBlob], fullFileName);
+            const file = new File([fileBlob], fullFileName, {
+                type: libraDriveExtension === "docx"
+                    ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    : "application/pdf"
+            });
             const folderName = libraDriveFolderName.trim() || "Recent Documents";
 
             // Panggil fungsi SaveFileToLibraDrive dari firebase
