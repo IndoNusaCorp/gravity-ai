@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { SidebarLeft } from "@/components/SidebarLeft";
-import { SidebarRight } from "@/components/SidebarRight";
+import { SidebarRight } from "@/components/BottomBar";
 import { Search, Send, X, Plus, Minus, FileText, BookOpen, GraduationCap, Newspaper, Check, PenTool, Link as LinkIcon, Upload, Edit3, Calculator, AlignLeft, MessageSquare, Table, Network, MoreHorizontal } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import Markdown from "markdown-to-jsx";
