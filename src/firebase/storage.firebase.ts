@@ -1,6 +1,7 @@
 import { connecttolibradrivestorage } from "./firebase.configuration";
 import { ref, uploadBytes, deleteObject } from "firebase/storage";
 import { Authentication } from "./firebase.configuration";
+import { getDownloadURL } from "firebase/storage";
 
 //File Ekstensi yang didukung untuk disimpan ke libradrive
 const supportedFileExtensions = [".docx", ".pdf"];
@@ -52,6 +53,9 @@ export async function SaveFileToLibraDrive(file: File, collectionName: string) {
         const SaveFileResult = await uploadBytes(storageRef, file);
 
         console.log("File berhasil diupload ke LibraDrive:", SaveFileResult.metadata.fullPath);
+
+        //Function supaya setelah di simpan di libra drive hasil simpan file dari gravity ai bisa di preview
+        const PreviewFile = await getDownloadURL(storageRef);
 
         return SaveFileResult;
     } catch (error) {
