@@ -40,6 +40,10 @@ export default function Home() {
   // State untuk halaman yang sedang dipilih (untuk delete)
   const [selectedPage, setSelectedPage] = useState(0);
 
+
+  //State untuk SelectText supaya bisa hanya text yang dipilih untuk di modifikasi
+  const [SelectText, setSelectText] = useState("");
+
   //efek tombol add paper
   const handleAddPaper = () => {
     setPageNumber((prev) => prev + 1);
@@ -819,6 +823,55 @@ export default function Home() {
     sendToAI(suggestion);
   };
 
+  // State untuk toolbar posisi (muncul di dekat teks yang diseleksi)
+  const [selectionToolbar, setSelectionToolbar] = useState<{ visible: boolean; x: number; y: number }>({ visible: false, x: 0, y: 0 });
+
+  // Logika untuk mendeteksi teks yang dipilih di editor
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+        setSelectText("");
+        setSelectionToolbar({ visible: false, x: 0, y: 0 });
+        return;
+      }
+
+      // Pastikan seleksi ada di dalam salah satu editor
+      const anchorNode = selection.anchorNode;
+      if (!anchorNode) return;
+
+      const editorParent = (anchorNode instanceof HTMLElement ? anchorNode : anchorNode.parentElement)?.closest('[id^="main-editor-"]');
+      if (!editorParent) {
+        setSelectText("");
+        setSelectionToolbar({ visible: false, x: 0, y: 0 });
+        return;
+      }
+
+      const selectedText = selection.toString();
+      setSelectText(selectedText);
+
+      // Posisi toolbar di atas teks yang diseleksi
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      setSelectionToolbar({
+        visible: true,
+        x: rect.left + rect.width / 2,
+        y: rect.top - 10,
+      });
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => document.removeEventListener("selectionchange", handleSelectionChange);
+  }, []);
+
+  // Fungsi untuk menerapkan format ke teks yang diseleksi
+  const applyFormatToSelection = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+    // Reset selection toolbar setelah apply
+    setSelectionToolbar({ visible: false, x: 0, y: 0 });
+    setSelectText("");
+  };
+
   return (
     <>
       <div className="relative flex flex-col items-center min-h-screen bg-[#D9E4D1]/50 dark:bg-[#0D0606]/50 font-sans overflow-x-hidden py-12 transition-colors duration-300">
@@ -1165,6 +1218,64 @@ export default function Home() {
           </motion.div>
         </div>
       </div>
+
+      {/* Selection Toolbar — muncul saat teks di-select */}
+      <AnimatePresence>
+        {selectionToolbar.visible && SelectText && (
+          <motion.div
+            initial={{ opacity: 0, y: 5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="fixed z-[200] flex items-center gap-1 bg-[#0D0606] dark:bg-[#D9E4D1] rounded-xl px-2 py-1.5 shadow-2xl border border-zinc-700 dark:border-zinc-300"
+            style={{
+              left: `${selectionToolbar.x}px`,
+              top: `${selectionToolbar.y}px`,
+              transform: 'translate(-50%, -100%)',
+            }}
+          >
+            {/* Bold */}
+            <button onClick={() => applyFormatToSelection('bold')} className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors text-xs font-bold" title="Bold">B</button>
+            {/* Italic */}
+            <button onClick={() => applyFormatToSelection('italic')} className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors text-xs italic" title="Italic">I</button>
+            {/* Underline */}
+            <button onClick={() => applyFormatToSelection('underline')} className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors text-xs underline" title="Underline">U</button>
+            <div className="w-px h-5 bg-white/20 dark:bg-black/10 mx-0.5" />
+            {/* Font Size */}
+            <select
+              onChange={(e) => { applyFormatToSelection('fontSize', e.target.value); }}
+              className="bg-transparent text-[#D9E4D1] dark:text-[#0D0606] text-xs outline-none cursor-pointer px-1 py-1 rounded-lg hover:bg-white/20 dark:hover:bg-black/10"
+              defaultValue=""
+              title="Ukuran Font"
+            >
+              <option value="" disabled className="text-zinc-900">Size</option>
+              <option value="1" className="text-zinc-900">Kecil</option>
+              <option value="3" className="text-zinc-900">Normal</option>
+              <option value="5" className="text-zinc-900">Besar</option>
+              <option value="7" className="text-zinc-900">Sangat Besar</option>
+            </select>
+            <div className="w-px h-5 bg-white/20 dark:bg-black/10 mx-0.5" />
+            {/* Font Color */}
+            <label className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors cursor-pointer text-xs" title="Warna Teks">
+              🎨
+              <input
+                type="color"
+                className="sr-only"
+                onChange={(e) => applyFormatToSelection('foreColor', e.target.value)}
+              />
+            </label>
+            {/* Highlight */}
+            <label className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors cursor-pointer text-xs" title="Highlight">
+              🖍️
+              <input
+                type="color"
+                className="sr-only"
+                onChange={(e) => applyFormatToSelection('hiliteColor', e.target.value)}
+              />
+            </label>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toast Notification */}
       <AnimatePresence>
