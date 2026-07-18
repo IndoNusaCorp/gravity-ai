@@ -825,12 +825,27 @@ export default function Home() {
 
   // State untuk toolbar posisi (muncul di dekat teks yang diseleksi)
   const [selectionToolbar, setSelectionToolbar] = useState<{ visible: boolean; x: number; y: number }>({ visible: false, x: 0, y: 0 });
+  const [customFontSize, setCustomFontSize] = useState("16");
+  const selectionToolbarRef = useRef<HTMLDivElement>(null);
+  const savedSelectionRangeRef = useRef<Range | null>(null);
+  const isUsingSelectionToolbarRef = useRef(false);
 
   // Logika untuk mendeteksi teks yang dipilih di editor
   useEffect(() => {
     const handleSelectionChange = () => {
       const selection = window.getSelection();
+
+      // Klik pada toolbar memindahkan fokus dari editor. Jangan tutup toolbar
+      // selama tombol, select, atau color picker sedang digunakan.
+      if (
+        isUsingSelectionToolbarRef.current ||
+        selectionToolbarRef.current?.contains(document.activeElement)
+      ) {
+        return;
+      }
+
       if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+        savedSelectionRangeRef.current = null;
         setSelectText("");
         setSelectionToolbar({ visible: false, x: 0, y: 0 });
         return;
@@ -842,6 +857,7 @@ export default function Home() {
 
       const editorParent = (anchorNode instanceof HTMLElement ? anchorNode : anchorNode.parentElement)?.closest('[id^="main-editor-"]');
       if (!editorParent) {
+        savedSelectionRangeRef.current = null;
         setSelectText("");
         setSelectionToolbar({ visible: false, x: 0, y: 0 });
         return;
@@ -852,6 +868,7 @@ export default function Home() {
 
       // Posisi toolbar di atas teks yang diseleksi
       const range = selection.getRangeAt(0);
+      savedSelectionRangeRef.current = range.cloneRange();
       const rect = range.getBoundingClientRect();
       setSelectionToolbar({
         visible: true,
@@ -866,7 +883,39 @@ export default function Home() {
 
   // Fungsi untuk menerapkan format ke teks yang diseleksi
   const applyFormatToSelection = (command: string, value?: string) => {
-    document.execCommand(command, false, value);
+    const selection = window.getSelection();
+    const savedRange = savedSelectionRangeRef.current;
+
+    // Kembalikan seleksi yang sempat hilang ketika kontrol toolbar menerima fokus.
+    if (selection && savedRange) {
+      selection.removeAllRanges();
+      selection.addRange(savedRange);
+    }
+
+    if (command === "fontSizePx" && value) {
+      // execCommand fontSize hanya mendukung nilai 1–7. Gunakan nilai
+      // sementara lalu ubah hasilnya menjadi ukuran px yang dapat dikustom.
+      const editor = savedRange
+        ? (savedRange.commonAncestorContainer instanceof HTMLElement
+          ? savedRange.commonAncestorContainer
+          : savedRange.commonAncestorContainer.parentElement
+        )?.closest('[id^="main-editor-"]')
+        : null;
+      const existingLargeFonts = new Set(editor?.querySelectorAll('font[size="7"]') ?? []);
+
+      document.execCommand("fontSize", false, "7");
+
+      editor?.querySelectorAll<HTMLElement>('font[size="7"]').forEach((fontElement) => {
+        if (!existingLargeFonts.has(fontElement)) {
+          fontElement.style.fontSize = `${value}px`;
+          fontElement.removeAttribute("size");
+        }
+      });
+    } else {
+      document.execCommand(command, false, value);
+    }
+    isUsingSelectionToolbarRef.current = false;
+    savedSelectionRangeRef.current = null;
     // Reset selection toolbar setelah apply
     setSelectionToolbar({ visible: false, x: 0, y: 0 });
     setSelectText("");
@@ -906,7 +955,7 @@ export default function Home() {
               >
 
                 {/* Page number badge — selalu tampil di kiri atas setiap halaman */}
-                <div className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[10px] font-bold z-20 transition-colors ${selectedPage === index
+                <div data-export-ignore="true" className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[10px] font-bold z-20 transition-colors ${selectedPage === index
                   ? 'bg-blue-500 text-white'
                   : 'bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 text-[#0D0606]/70 dark:text-[#D9E4D1]/70'
                   }`}>
@@ -961,6 +1010,7 @@ export default function Home() {
                       {/* Delete button (only visible on hover) */}
                       <button
                         onClick={() => setUploadedImages(prev => prev.filter(i => i.id !== img.id))}
+                        data-export-ignore="true"
                         className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 pointer-events-auto"
                       >
                         <X className="w-3 h-3" />
@@ -1223,10 +1273,14 @@ export default function Home() {
       <AnimatePresence>
         {selectionToolbar.visible && SelectText && (
           <motion.div
+            ref={selectionToolbarRef}
             initial={{ opacity: 0, y: 5, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 5, scale: 0.95 }}
             transition={{ duration: 0.15 }}
+            onPointerDownCapture={() => {
+              isUsingSelectionToolbarRef.current = true;
+            }}
             className="fixed z-[200] flex items-center gap-1 bg-[#0D0606] dark:bg-[#D9E4D1] rounded-xl px-2 py-1.5 shadow-2xl border border-zinc-700 dark:border-zinc-300"
             style={{
               left: `${selectionToolbar.x}px`,
@@ -1241,18 +1295,40 @@ export default function Home() {
             {/* Underline */}
             <button onClick={() => applyFormatToSelection('underline')} className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors text-xs underline" title="Underline">U</button>
             <div className="w-px h-5 bg-white/20 dark:bg-black/10 mx-0.5" />
-            {/* Font Size */}
+            {/* Font Size — ketik ukuran dalam px, lalu tekan Enter */}
+            <input
+              type="number"
+              min="8"
+              max="96"
+              value={customFontSize}
+              onChange={(e) => setCustomFontSize(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const size = Math.min(96, Math.max(8, Number(customFontSize) || 16));
+                  setCustomFontSize(String(size));
+                  applyFormatToSelection("fontSizePx", String(size));
+                }
+              }}
+              className="w-14 bg-transparent text-[#D9E4D1] dark:text-[#0D0606] text-xs outline-none px-1 py-1 rounded-lg hover:bg-white/20 dark:hover:bg-black/10"
+              title="Ukuran font (8–96 px), tekan Enter untuk menerapkan"
+              aria-label="Ukuran font dalam pixel"
+            />
+            <div className="w-px h-5 bg-white/20 dark:bg-black/10 mx-0.5" />
+            {/* Font Change (font family) */}
             <select
-              onChange={(e) => { applyFormatToSelection('fontSize', e.target.value); }}
+              onChange={(e) => { applyFormatToSelection('fontName', e.target.value); }}
               className="bg-transparent text-[#D9E4D1] dark:text-[#0D0606] text-xs outline-none cursor-pointer px-1 py-1 rounded-lg hover:bg-white/20 dark:hover:bg-black/10"
               defaultValue=""
-              title="Ukuran Font"
+              title="Jenis Font"
             >
-              <option value="" disabled className="text-zinc-900">Size</option>
-              <option value="1" className="text-zinc-900">Kecil</option>
-              <option value="3" className="text-zinc-900">Normal</option>
-              <option value="5" className="text-zinc-900">Besar</option>
-              <option value="7" className="text-zinc-900">Sangat Besar</option>
+              <option value="" disabled className="text-zinc-900">Font</option>
+              <option value="Inter" className="text-zinc-900">Inter</option>
+              <option value="Times New Roman" className="text-zinc-900">Times New Roman</option>
+              <option value="Geist" className="text-zinc-900">Geist</option>
+              <option value="Georgia" className="text-zinc-900">Georgia</option>
+              <option value="Arial" className="text-zinc-900">Arial</option>
+              <option value="Courier New" className="text-zinc-900">Courier New</option>
             </select>
             <div className="w-px h-5 bg-white/20 dark:bg-black/10 mx-0.5" />
             {/* Font Color */}

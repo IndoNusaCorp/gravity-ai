@@ -8,7 +8,7 @@ import { Authentication } from "../firebase/firebase.configuration";
 import { AuthModal, AuthType } from "./AuthModal";
 
 // Library untuk generate file DOCX & PDF yang valid
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, SectionType, ShadingType, UnderlineType } from "docx";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -105,96 +105,160 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                 // File .docx asli adalah arsip ZIP berisi XML, bukan HTML biasa
                 // ============================================================
 
-                // Fungsi helper: Konversi HTML node menjadi array Paragraph untuk docx
-                // Membaca setiap elemen HTML (h1, h2, p, dll) dan mengubahnya jadi format docx
+                // Konversi warna CSS rgb/hex menjadi warna OOXML tanpa tanda "#".
+                const cssColorToHex = (color: string): string | undefined => {
+                    if (!color || color === "transparent" || color === "rgba(0, 0, 0, 0)") return undefined;
+                    if (color.startsWith("#")) {
+                        const hex = color.slice(1);
+                        return hex.length === 3
+                            ? hex.split("").map((char) => char + char).join("").toUpperCase()
+                            : hex.slice(0, 6).toUpperCase();
+                    }
+
+                    const rgb = color.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+                    if (!rgb) return undefined;
+                    return [rgb[1], rgb[2], rgb[3]]
+                        .map((value) => Number(value).toString(16).padStart(2, "0"))
+                        .join("")
+                        .toUpperCase();
+                };
+
+                const getParagraphAlignment = (element: HTMLElement) => {
+                    const alignment = window.getComputedStyle(element).textAlign;
+                    if (alignment === "center") return AlignmentType.CENTER;
+                    if (alignment === "right" || alignment === "end") return AlignmentType.RIGHT;
+                    if (alignment === "justify") return AlignmentType.JUSTIFIED;
+                    return AlignmentType.LEFT;
+                };
+
+                // Buat TextRun per text node agar format inline (font, size, warna,
+                // highlight, bold, italic, underline) tidak hilang atau pecah baris.
+                const textNodeToRun = (node: Node): TextRun | null => {
+                    const text = node.textContent?.replace(/\u00a0/g, " ");
+                    const parent = node.parentElement;
+                    if (!text || !parent) return null;
+
+                    const style = window.getComputedStyle(parent);
+                    const fontSizePx = Number.parseFloat(style.fontSize) || 16;
+                    const fontWeight = Number.parseInt(style.fontWeight, 10);
+                    const color = cssColorToHex(style.color);
+                    const background = cssColorToHex(style.backgroundColor);
+                    const fontFamily = style.fontFamily
+                        .split(",")[0]
+                        .trim()
+                        .replace(/^["']|["']$/g, "");
+
+                    return new TextRun({
+                        text,
+                        font: fontFamily || "Arial",
+                        // DOCX menggunakan half-point; 1 CSS px = 0,75 pt.
+                        size: Math.max(1, Math.round(fontSizePx * 1.5)),
+                        bold: Number.isNaN(fontWeight) ? style.fontWeight === "bold" : fontWeight >= 600,
+                        italics: style.fontStyle === "italic",
+                        underline: style.textDecorationLine.includes("underline")
+                            ? { type: UnderlineType.SINGLE }
+                            : undefined,
+                        color,
+                        shading: background
+                            ? { type: ShadingType.CLEAR, fill: background, color: "auto" }
+                            : undefined,
+                    });
+                };
+
+                const blockTags = new Set([
+                    "address", "article", "blockquote", "div", "h1", "h2", "h3",
+                    "h4", "h5", "h6", "li", "ol", "p", "pre", "section", "ul",
+                ]);
+
+                // Fungsi helper: konversi HTML menjadi Paragraph tanpa menjadikan
+                // setiap <span>/<font>/<b> sebagai paragraf baru.
                 const htmlToParagraphs = (element: HTMLElement): Paragraph[] => {
                     const paragraphs: Paragraph[] = [];
-                    const children = element.childNodes;
+                    let currentRuns: TextRun[] = [];
 
-                    children.forEach((node) => {
+                    const flushParagraph = (sourceElement: HTMLElement = element) => {
+                        if (currentRuns.length === 0) return;
+                        paragraphs.push(new Paragraph({
+                            children: currentRuns,
+                            alignment: getParagraphAlignment(sourceElement),
+                            spacing: { after: 0, line: 240 },
+                        }));
+                        currentRuns = [];
+                    };
+
+                    const collectInlineRuns = (node: Node) => {
                         if (node.nodeType === Node.TEXT_NODE) {
-                            // Text biasa → Paragraph biasa
-                            const text = node.textContent?.trim();
-                            if (text) {
-                                paragraphs.push(new Paragraph({
-                                    children: [new TextRun({ text })],
-                                }));
-                            }
-                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                            const el = node as HTMLElement;
-                            const tagName = el.tagName.toLowerCase();
+                            const run = textNodeToRun(node);
+                            if (run) currentRuns.push(run);
+                            return;
+                        }
+                        if (!(node instanceof HTMLElement)) return;
 
-                            // Deteksi heading (h1, h2, h3, dll)
-                            if (tagName === "h1") {
-                                paragraphs.push(new Paragraph({
-                                    children: [new TextRun({ text: el.textContent || "", bold: true, size: 32 })],
-                                    heading: HeadingLevel.HEADING_1,
-                                    alignment: AlignmentType.CENTER,
-                                }));
-                            } else if (tagName === "h2") {
-                                paragraphs.push(new Paragraph({
-                                    children: [new TextRun({ text: el.textContent || "", bold: true, size: 28 })],
-                                    heading: HeadingLevel.HEADING_2,
-                                }));
-                            } else if (tagName === "h3") {
-                                paragraphs.push(new Paragraph({
-                                    children: [new TextRun({ text: el.textContent || "", bold: true, size: 24 })],
-                                    heading: HeadingLevel.HEADING_3,
-                                }));
-                            } else if (tagName === "ul" || tagName === "ol") {
-                                // List items → Paragraph per item dengan bullet/number
-                                const items = el.querySelectorAll("li");
-                                items.forEach((li, idx) => {
-                                    const prefix = tagName === "ol" ? `${idx + 1}. ` : "• ";
-                                    paragraphs.push(new Paragraph({
-                                        children: [new TextRun({ text: prefix + (li.textContent || "") })],
-                                        spacing: { before: 100 },
+                        if (node.tagName.toLowerCase() === "br") {
+                            currentRuns.push(new TextRun({ break: 1 }));
+                            return;
+                        }
+
+                        node.childNodes.forEach(collectInlineRuns);
+                    };
+
+                    element.childNodes.forEach((node) => {
+                        if (node instanceof HTMLElement && blockTags.has(node.tagName.toLowerCase())) {
+                            flushParagraph();
+
+                            if (node.tagName.toLowerCase() === "ul" || node.tagName.toLowerCase() === "ol") {
+                                Array.from(node.children).forEach((item, itemIndex) => {
+                                    const prefix = node.tagName.toLowerCase() === "ol" ? `${itemIndex + 1}. ` : "• ";
+                                    currentRuns.push(new TextRun({
+                                        text: prefix,
+                                        font: window.getComputedStyle(item).fontFamily.split(",")[0].replace(/["']/g, ""),
                                     }));
+                                    collectInlineRuns(item);
+                                    flushParagraph(item as HTMLElement);
                                 });
-                            } else if (tagName === "br") {
-                                // Line break → Paragraph kosong
-                                paragraphs.push(new Paragraph({ children: [] }));
-                            } else if (tagName === "strong" || tagName === "b") {
-                                paragraphs.push(new Paragraph({
-                                    children: [new TextRun({ text: el.textContent || "", bold: true })],
-                                }));
-                            } else if (tagName === "em" || tagName === "i") {
-                                paragraphs.push(new Paragraph({
-                                    children: [new TextRun({ text: el.textContent || "", italics: true })],
-                                }));
+                            } else if (Array.from(node.children).some((child) => blockTags.has(child.tagName.toLowerCase()))) {
+                                paragraphs.push(...htmlToParagraphs(node));
                             } else {
-                                // Elemen lain (p, div, span, dll) → ambil text content
-                                // Jika punya child elements, proses rekursif
-                                if (el.children.length > 0) {
-                                    paragraphs.push(...htmlToParagraphs(el));
-                                } else {
-                                    const text = el.textContent?.trim();
-                                    if (text) {
-                                        paragraphs.push(new Paragraph({
-                                            children: [new TextRun({ text })],
-                                            spacing: { after: 200 },
-                                        }));
-                                    }
-                                }
+                                collectInlineRuns(node);
+                                flushParagraph(node);
                             }
+                        } else {
+                            collectInlineRuns(node);
                         }
                     });
 
+                    flushParagraph();
                     return paragraphs;
                 };
 
-                // Kumpulkan semua paragraphs dari semua halaman editor
-                const allParagraphs: Paragraph[] = [];
-                pages.forEach((pageDom) => {
-                    allParagraphs.push(...htmlToParagraphs(pageDom));
+                const paragraphsPerPage = pages.map((pageDom) => {
+                    const paragraphs = htmlToParagraphs(pageDom);
+                    return paragraphs.length > 0
+                        ? paragraphs
+                        : [new Paragraph({ children: [] })];
                 });
 
-                // Buat Document docx yang valid menggunakan library "docx"
+                // Satu editor menjadi satu section/halaman DOCX, dengan margin
+                // yang mengikuti padding editor: 64px atas, 96px kiri, 48px kanan.
                 const doc = new Document({
-                    sections: [{
-                        properties: {},
-                        children: allParagraphs,
-                    }],
+                    sections: paragraphsPerPage.map((paragraphs, pageIndex) => ({
+                        properties: {
+                            type: pageIndex === 0 ? SectionType.CONTINUOUS : SectionType.NEXT_PAGE,
+                            page: {
+                                size: { width: 11906, height: 16838 },
+                                margin: {
+                                    top: 960,
+                                    right: 720,
+                                    bottom: 960,
+                                    left: 1440,
+                                    header: 0,
+                                    footer: 0,
+                                    gutter: 0,
+                                },
+                            },
+                        },
+                        children: paragraphs,
+                    })),
                 });
 
                 // Packer.toBlob() menghasilkan file .docx yang valid (ZIP berisi XML)
@@ -209,31 +273,30 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                 const pdf = new jsPDF("p", "mm", "a4");
                 const pdfWidth = pdf.internal.pageSize.getWidth();
                 const pdfHeight = pdf.internal.pageSize.getHeight();
-                const margin = 10; // margin 10mm di setiap sisi
 
                 for (let i = 0; i < pages.length; i++) {
-                    // Tangkap tampilan visual halaman editor sebagai canvas/gambar
+                    // Tangkap editor secara langsung. Elemen kertas induk memiliki
+                    // border, shadow, dan transform animasi yang dapat membuat
+                    // html2canvas gagal pada beberapa browser.
+                    const paperBackground =
+                        window.getComputedStyle(pages[i].parentElement ?? pages[i]).backgroundColor ||
+                        "#ffffff";
                     const canvas = await html2canvas(pages[i], {
                         scale: 2, // Resolusi 2x untuk kualitas lebih baik
                         useCORS: true, // Izinkan gambar cross-origin
-                        backgroundColor: "#ffffff",
+                        backgroundColor: paperBackground,
+                        logging: false,
                     });
 
                     // Konversi canvas ke gambar PNG
                     const imgData = canvas.toDataURL("image/png");
 
-                    // Hitung dimensi gambar agar pas di halaman PDF dengan margin
-                    const availableWidth = pdfWidth - (margin * 2);
-                    const availableHeight = pdfHeight - (margin * 2);
+                    // Editor sudah mempunyai margin internal melalui padding.
+                    // Gunakan lebar PDF penuh agar ukuran font/posisi tidak mengecil.
                     const imgRatio = canvas.height / canvas.width;
-                    let imgWidth = availableWidth;
+                    const imgWidth = pdfWidth;
                     let imgHeight = imgWidth * imgRatio;
-
-                    // Jika tinggi gambar melebihi halaman, sesuaikan
-                    if (imgHeight > availableHeight) {
-                        imgHeight = availableHeight;
-                        imgWidth = imgHeight / imgRatio;
-                    }
+                    imgHeight = Math.min(imgHeight, pdfHeight);
 
                     // Tambahkan halaman baru untuk halaman ke-2 dan seterusnya
                     if (i > 0) {
@@ -241,7 +304,7 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                     }
 
                     // Masukkan gambar ke halaman PDF
-                    pdf.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
+                    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
                 }
 
                 // Output PDF sebagai Blob yang valid
@@ -942,4 +1005,3 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
         </>
     );
 }
-
