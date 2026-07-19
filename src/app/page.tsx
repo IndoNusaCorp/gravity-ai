@@ -927,7 +927,7 @@ export default function Home() {
         <Analytics />
         {/* Sidebars */}
         <SidebarLeft />
-        <SidebarRight onImageUpload={handleImageUpload} />
+        <SidebarRight onImageUpload={handleImageUpload} selectedPageIndex={selectedPage} />
 
         {/* Main Content Area */}
         <main className="relative z-10 w-full flex flex-col items-center justify-start sm:p-4 transition-all duration-500 min-h-[85vh] md:pl-[23rem] md:pr-72 pt-20">
@@ -1004,6 +1004,7 @@ export default function Home() {
                       <img
                         src={img.src}
                         alt="Uploaded content"
+                        data-paper-uploaded-image="true"
                         className="max-w-[300px] max-h-[300px] object-contain rounded-lg shadow-sm border border-transparent group-hover:border-zinc-300 dark:group-hover:border-zinc-700 transition-colors pointer-events-auto"
                         draggable={false} // Mencegah perilaku drag bawaan browser pada gambar
                       />

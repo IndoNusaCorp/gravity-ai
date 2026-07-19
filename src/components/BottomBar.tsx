@@ -1,23 +1,23 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, Printer, Palette, Layers, FileText, Image, User, DockIcon, HardDrive, Server, X, CheckCircle, AlertCircle, Loader2, FolderOpen, Upload } from "lucide-react";
+import { Settings, Printer, Palette, Layers, FileText, Image, User, DockIcon, HardDrive, Server, X, CheckCircle, AlertCircle, Loader2, FolderOpen, Upload, Pen, Trash2 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Authentication } from "../firebase/firebase.configuration";
 import { AuthModal, AuthType } from "./AuthModal";
 
 // Library untuk generate file DOCX & PDF yang valid
-import { Document, Packer, Paragraph, TextRun, AlignmentType, SectionType, ShadingType, UnderlineType } from "docx";
+import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, SectionType, ShadingType, UnderlineType } from "docx";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
-
 interface SidebarRightProps {
     onImageUpload?: (src: string) => void;
+    selectedPageIndex?: number;
 }
 
-export function SidebarRight({ onImageUpload }: SidebarRightProps) {
+export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRightProps) {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [authModalType, setAuthModalType] = useState<AuthType>("login");
 
@@ -51,7 +51,271 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
     // State untuk menyimpan jenis/ukuran kertas (default A4)
     const [paperType, setPaperType] = useState("a4");
 
+    //State untuk membuat tanda tangan (signature)
+    const [startCreateSignature, setstartCreateSignature] = useState(true);
+    const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
+    const [hasSignatureStroke, setHasSignatureStroke] = useState(false);
+    const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
+    const isDrawingSignatureRef = useRef(false);
+    const signatureLineConfigRef = useRef<{
+        canvas: HTMLCanvasElement | null;
+        line: CanvasRenderingContext2D | null;
+        linemovestart: { x: number; y: number };
+        linemoveend: { x: number; y: number };
+        boldline: number;
+    }>({
+        canvas: null,
+        line: null,
+        linemovestart: { x: 0, y: 0 },
+        linemoveend: { x: 0, y: 0 },
+        boldline: 1,
+    });
+
+    const [deletesignature, setdeletesignature] = useState(true);
+    const [hasSelectedSignature, setHasSelectedSignature] = useState(false);
+    const selectedSignatureRef = useRef<HTMLElement | null>(null);
+
     const [uploadImage, setUploadImage] = useState<string | null>(null);
+
+    // Dipanggil langsung oleh createSignature() untuk memulai UI menggambar garis.
+    const linestroke = (
+        canvas: HTMLCanvasElement | null,
+        line: CanvasRenderingContext2D | null,
+        linemovestart: { x: number; y: number },
+        linemoveend: { x: number; y: number },
+        boldline: number,
+    ) => {
+        signatureLineConfigRef.current = {
+            canvas,
+            line,
+            linemovestart,
+            linemoveend,
+            boldline,
+        };
+        setIsSignatureModalOpen(true);
+    };
+
+    //Membuat fungsi signature 
+    const createSignature = () => {
+        //Memulai untuk membuat tanda tangan (signature)
+        //Menggunakan logika if else
+        if (startCreateSignature) {
+            setstartCreateSignature(false);
+            
+            //Canvas untuk wadah
+            const canvas = signatureCanvasRef.current;
+
+            //line untuk membuat garis
+            const line = canvas?.getContext("2d") ?? null;
+            
+            //Titik Awal (X, Y)
+            const linemovestart = { x: 0, y: 0 }; //titik awalan garis
+            const linemoveend = { x: 0, y: 0 }; //titik akhir garis
+            const boldline = 1; //Ketebalan garis
+            linestroke(canvas, line, linemovestart, linemoveend, boldline); 
+
+
+        }
+    }
+
+    const prepareSignatureCanvas = () => {
+        const canvas = signatureCanvasRef.current;
+        if (!canvas) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const pixelRatio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = Math.max(1, Math.round(rect.width * pixelRatio));
+        canvas.height = Math.max(1, Math.round(rect.height * pixelRatio));
+
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        context.lineCap = "round";
+        context.lineJoin = "round";
+        context.lineWidth = signatureLineConfigRef.current.boldline;
+        context.strokeStyle = "#0D0606";
+        signatureLineConfigRef.current.canvas = canvas;
+        signatureLineConfigRef.current.line = context;
+        setHasSignatureStroke(false);
+    };
+
+    useEffect(() => {
+        if (!isSignatureModalOpen) {
+            setstartCreateSignature(true);
+            return;
+        }
+        const frame = window.requestAnimationFrame(prepareSignatureCanvas);
+        return () => window.cancelAnimationFrame(frame);
+    }, [isSignatureModalOpen]);
+
+    const getCanvasPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        return {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top,
+        };
+    };
+
+    const handleSignaturePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        isDrawingSignatureRef.current = true;
+        const point = getCanvasPoint(event);
+        signatureLineConfigRef.current.linemovestart.x = point.x;
+        signatureLineConfigRef.current.linemovestart.y = point.y;
+        signatureLineConfigRef.current.linemoveend.x = point.x;
+        signatureLineConfigRef.current.linemoveend.y = point.y;
+    };
+
+    const handleSignaturePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+        if (!isDrawingSignatureRef.current) return;
+        event.preventDefault();
+
+        const { line, linemovestart, linemoveend } = signatureLineConfigRef.current;
+        if (!line) return;
+
+        const point = getCanvasPoint(event);
+        linemoveend.x = point.x;
+        linemoveend.y = point.y;
+
+        line.beginPath();
+        line.moveTo(linemovestart.x, linemovestart.y);
+        line.lineTo(linemoveend.x, linemoveend.y);
+        line.stroke();
+
+        linemovestart.x = linemoveend.x;
+        linemovestart.y = linemoveend.y;
+        setHasSignatureStroke(true);
+    };
+
+    const handleSignaturePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        isDrawingSignatureRef.current = false;
+    };
+
+    const clearSignatureCanvas = () => {
+        const canvas = signatureCanvasRef.current;
+        const context = canvas?.getContext("2d");
+        if (!canvas || !context) return;
+        const rect = canvas.getBoundingClientRect();
+        context.clearRect(0, 0, rect.width, rect.height);
+        setHasSignatureStroke(false);
+    };
+
+    const selectSignature = (signatureElement: HTMLElement) => {
+        if (selectedSignatureRef.current && selectedSignatureRef.current !== signatureElement) {
+            selectedSignatureRef.current.style.outline = "none";
+        }
+
+        selectedSignatureRef.current = signatureElement;
+        signatureElement.style.outline = "2px dashed #3b82f6";
+        signatureElement.style.outlineOffset = "4px";
+        setHasSelectedSignature(true);
+    };
+
+    const applySignatureToPaper = () => {
+        const canvas = signatureCanvasRef.current;
+        if (!canvas || !hasSignatureStroke) return;
+
+        const targetEditor =
+            document.getElementById(`main-editor-${selectedPageIndex}`) ??
+            document.getElementById("main-editor-0");
+        if (!targetEditor) return;
+
+        const signatureContainer = document.createElement("div");
+        signatureContainer.dataset.signature = "true";
+        signatureContainer.contentEditable = "false";
+        signatureContainer.title = "Geser untuk memindahkan tanda tangan";
+        signatureContainer.style.position = "absolute";
+        signatureContainer.style.width = "260px";
+        signatureContainer.style.height = "100px";
+        signatureContainer.style.cursor = "grab";
+        signatureContainer.style.touchAction = "none";
+        signatureContainer.style.userSelect = "none";
+        signatureContainer.style.zIndex = "40";
+
+        const signatureImage = document.createElement("img");
+        signatureImage.src = canvas.toDataURL("image/png");
+        signatureImage.alt = "Tanda tangan";
+        signatureImage.dataset.signatureImage = "true";
+        signatureImage.style.width = "100%";
+        signatureImage.style.height = "100%";
+        signatureImage.style.objectFit = "contain";
+        signatureImage.style.objectPosition = "center";
+        signatureImage.style.pointerEvents = "none";
+        signatureImage.draggable = false;
+
+        signatureContainer.appendChild(signatureImage);
+        targetEditor.appendChild(signatureContainer);
+        selectSignature(signatureContainer);
+
+        // Posisi awal berada di kanan bawah paper dan tetap di dalam batas halaman.
+        signatureContainer.style.left = `${Math.max(0, targetEditor.clientWidth - 308)}px`;
+        signatureContainer.style.top = `${Math.max(0, targetEditor.clientHeight - 164)}px`;
+
+        // Signature menjadi objek paper yang dapat dipindahkan dengan pointer.
+        signatureContainer.addEventListener("pointerdown", (pointerDownEvent) => {
+            pointerDownEvent.preventDefault();
+            pointerDownEvent.stopPropagation();
+            selectSignature(signatureContainer);
+            signatureContainer.setPointerCapture(pointerDownEvent.pointerId);
+            signatureContainer.style.cursor = "grabbing";
+
+            const startPointerX = pointerDownEvent.clientX;
+            const startPointerY = pointerDownEvent.clientY;
+            const startLeft = signatureContainer.offsetLeft;
+            const startTop = signatureContainer.offsetTop;
+
+            const moveSignature = (pointerMoveEvent: PointerEvent) => {
+                if (pointerMoveEvent.pointerId !== pointerDownEvent.pointerId) return;
+                pointerMoveEvent.preventDefault();
+
+                const nextLeft = startLeft + pointerMoveEvent.clientX - startPointerX;
+                const nextTop = startTop + pointerMoveEvent.clientY - startPointerY;
+                const maxLeft = Math.max(0, targetEditor.clientWidth - signatureContainer.offsetWidth);
+                const maxTop = Math.max(0, targetEditor.clientHeight - signatureContainer.offsetHeight);
+
+                signatureContainer.style.left = `${Math.min(Math.max(0, nextLeft), maxLeft)}px`;
+                signatureContainer.style.top = `${Math.min(Math.max(0, nextTop), maxTop)}px`;
+            };
+
+            const stopMovingSignature = (pointerUpEvent: PointerEvent) => {
+                if (pointerUpEvent.pointerId !== pointerDownEvent.pointerId) return;
+                signatureContainer.style.cursor = "grab";
+                signatureContainer.removeEventListener("pointermove", moveSignature);
+                signatureContainer.removeEventListener("pointerup", stopMovingSignature);
+                signatureContainer.removeEventListener("pointercancel", stopMovingSignature);
+                targetEditor.dispatchEvent(new Event("input", { bubbles: true }));
+            };
+
+            signatureContainer.addEventListener("pointermove", moveSignature);
+            signatureContainer.addEventListener("pointerup", stopMovingSignature);
+            signatureContainer.addEventListener("pointercancel", stopMovingSignature);
+        });
+
+        targetEditor.dispatchEvent(new Event("input", { bubbles: true }));
+        setIsSignatureModalOpen(false);
+    };
+
+    //Untuk menghapus signature (tanda tangan)
+    const Deletesignature = () => {
+        const clicksignature = selectedSignatureRef.current;
+        
+        if (clicksignature && deletesignature) {
+            setdeletesignature(false);
+
+            const targetEditor = clicksignature.parentElement;
+            clicksignature.remove();
+            clearSignatureCanvas();
+
+            selectedSignatureRef.current = null;
+            setHasSelectedSignature(false);
+            setdeletesignature(true);
+            targetEditor?.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+    }
 
     //Logika if else untuk simpan file ke libradrive (Front End)
     const handleSaveToLibraDrive = () => {
@@ -94,6 +358,36 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                 index++;
                 p = document.getElementById(`main-editor-${index}`);
             }
+
+            // Normalisasi semua format gambar browser menjadi PNG agar dapat
+            // digunakan secara konsisten oleh jsPDF dan library DOCX.
+            const imageElementToPngDataUrl = async (image: HTMLImageElement): Promise<string> => {
+                if (!image.complete || image.naturalWidth === 0) {
+                    await new Promise<void>((resolve, reject) => {
+                        image.addEventListener("load", () => resolve(), { once: true });
+                        image.addEventListener("error", () => reject(new Error("Gambar upload gagal dimuat.")), { once: true });
+                    });
+                }
+
+                const imageCanvas = document.createElement("canvas");
+                imageCanvas.width = Math.max(1, image.naturalWidth || image.width);
+                imageCanvas.height = Math.max(1, image.naturalHeight || image.height);
+                const imageContext = imageCanvas.getContext("2d");
+                if (!imageContext) throw new Error("Canvas gambar tidak tersedia.");
+                imageContext.drawImage(image, 0, 0, imageCanvas.width, imageCanvas.height);
+                return imageCanvas.toDataURL("image/png");
+            };
+
+            const pngDataUrlToBytes = (dataUrl: string): Uint8Array => {
+                const base64Data = dataUrl.split(",")[1];
+                if (!base64Data) return new Uint8Array();
+                const binary = window.atob(base64Data);
+                const imageBytes = new Uint8Array(binary.length);
+                for (let byteIndex = 0; byteIndex < binary.length; byteIndex++) {
+                    imageBytes[byteIndex] = binary.charCodeAt(byteIndex);
+                }
+                return imageBytes;
+            };
 
             // Buat file DOCX atau PDF yang valid sesuai ekstensi yang dipilih
             const fullFileName = `${libraDriveFileName.trim()}.${libraDriveExtension}`;
@@ -231,12 +525,63 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                     return paragraphs;
                 };
 
-                const paragraphsPerPage = pages.map((pageDom) => {
+                const paragraphsPerPage = await Promise.all(pages.map(async (pageDom) => {
                     const paragraphs = htmlToParagraphs(pageDom);
+
+                    // Canvas disimpan sebagai PNG dan dimasukkan sebagai gambar asli
+                    // agar signature tetap terlihat pada DOCX di LibraDrive.
+                    pageDom.querySelectorAll<HTMLImageElement>("img[data-signature-image='true']").forEach((image) => {
+                        const imageBytes = pngDataUrlToBytes(image.src);
+                        if (imageBytes.length === 0) return;
+
+                        paragraphs.push(new Paragraph({
+                            alignment: AlignmentType.RIGHT,
+                            spacing: { before: 160, after: 0 },
+                            children: [
+                                new ImageRun({
+                                    data: imageBytes,
+                                    transformation: { width: 260, height: 100 },
+                                    type: "png",
+                                }),
+                            ],
+                        }));
+                    });
+
+                    // Gambar upload berada sebagai layer sibling dari editor.
+                    // Konversi ke PNG lalu masukkan sebagai ImageRun DOCX.
+                    const uploadedImages = Array.from(
+                        pageDom.parentElement?.querySelectorAll<HTMLImageElement>(
+                            "img[data-paper-uploaded-image='true']"
+                        ) ?? []
+                    );
+                    for (const uploadedImage of uploadedImages) {
+                        const pngDataUrl = await imageElementToPngDataUrl(uploadedImage);
+                        const imageBytes = pngDataUrlToBytes(pngDataUrl);
+                        const imageRect = uploadedImage.getBoundingClientRect();
+                        const sourceWidth = Math.max(1, imageRect.width || uploadedImage.naturalWidth);
+                        const sourceHeight = Math.max(1, imageRect.height || uploadedImage.naturalHeight);
+                        const scale = Math.min(1, 480 / sourceWidth, 300 / sourceHeight);
+
+                        paragraphs.push(new Paragraph({
+                            alignment: AlignmentType.CENTER,
+                            spacing: { before: 160, after: 80 },
+                            children: [
+                                new ImageRun({
+                                    data: imageBytes,
+                                    transformation: {
+                                        width: Math.max(1, Math.round(sourceWidth * scale)),
+                                        height: Math.max(1, Math.round(sourceHeight * scale)),
+                                    },
+                                    type: "png",
+                                }),
+                            ],
+                        }));
+                    }
+
                     return paragraphs.length > 0
                         ? paragraphs
                         : [new Paragraph({ children: [] })];
-                });
+                }));
 
                 // Satu editor menjadi satu section/halaman DOCX, dengan margin
                 // yang mengikuti padding editor: 64px atas, 96px kiri, 48px kanan.
@@ -275,18 +620,73 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                 const pdfHeight = pdf.internal.pageSize.getHeight();
 
                 for (let i = 0; i < pages.length; i++) {
+                    const pageRect = pages[i].getBoundingClientRect();
+                    const signatureElements = Array.from(
+                        pages[i].querySelectorAll<HTMLElement>("[data-signature='true']")
+                    );
+
+                    // Ambil posisi signature terbaru dari paper sebelum membuat PDF.
+                    // Signature dirender sebagai layer PDF terpisah supaya koordinat
+                    // hasil drag tidak direset oleh proses clone html2canvas.
+                    const signatureLayers = signatureElements.flatMap((signatureElement) => {
+                        const signatureImage =
+                            signatureElement.querySelector<HTMLImageElement>("img[data-signature-image='true']");
+                        if (!signatureImage || pageRect.width === 0 || pageRect.height === 0) return [];
+
+                        const signatureRect = signatureElement.getBoundingClientRect();
+                        return [{
+                            imageData: signatureImage.src,
+                            leftRatio: (signatureRect.left - pageRect.left) / pageRect.width,
+                            topRatio: (signatureRect.top - pageRect.top) / pageRect.height,
+                            widthRatio: signatureRect.width / pageRect.width,
+                            heightRatio: signatureRect.height / pageRect.height,
+                        }];
+                    });
+
+                    // Gambar upload berada di luar main-editor. Baca posisi visual
+                    // terbarunya dan jadikan layer PDF terpisah.
+                    const uploadedImageElements = Array.from(
+                        pages[i].parentElement?.querySelectorAll<HTMLImageElement>(
+                            "img[data-paper-uploaded-image='true']"
+                        ) ?? []
+                    );
+                    const uploadedImageLayers = await Promise.all(uploadedImageElements.map(async (uploadedImage) => {
+                        const imageRect = uploadedImage.getBoundingClientRect();
+                        return {
+                            imageData: await imageElementToPngDataUrl(uploadedImage),
+                            leftRatio: (imageRect.left - pageRect.left) / pageRect.width,
+                            topRatio: (imageRect.top - pageRect.top) / pageRect.height,
+                            widthRatio: imageRect.width / pageRect.width,
+                            heightRatio: imageRect.height / pageRect.height,
+                        };
+                    }));
+
+                    // Sembunyikan sementara agar signature tidak tergambar dua kali:
+                    // sekali oleh html2canvas dan sekali oleh layer jsPDF.
+                    const previousVisibility = signatureElements.map((element) => element.style.visibility);
+                    signatureElements.forEach((element) => {
+                        element.style.visibility = "hidden";
+                    });
+
                     // Tangkap editor secara langsung. Elemen kertas induk memiliki
                     // border, shadow, dan transform animasi yang dapat membuat
                     // html2canvas gagal pada beberapa browser.
                     const paperBackground =
                         window.getComputedStyle(pages[i].parentElement ?? pages[i]).backgroundColor ||
                         "#ffffff";
-                    const canvas = await html2canvas(pages[i], {
-                        scale: 2, // Resolusi 2x untuk kualitas lebih baik
-                        useCORS: true, // Izinkan gambar cross-origin
-                        backgroundColor: paperBackground,
-                        logging: false,
-                    });
+                    let canvas: HTMLCanvasElement;
+                    try {
+                        canvas = await html2canvas(pages[i], {
+                            scale: 2, // Resolusi 2x untuk kualitas lebih baik
+                            useCORS: true, // Izinkan gambar cross-origin
+                            backgroundColor: paperBackground,
+                            logging: false,
+                        });
+                    } finally {
+                        signatureElements.forEach((element, signatureIndex) => {
+                            element.style.visibility = previousVisibility[signatureIndex];
+                        });
+                    }
 
                     // Konversi canvas ke gambar PNG
                     const imgData = canvas.toDataURL("image/png");
@@ -305,6 +705,30 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
 
                     // Masukkan gambar ke halaman PDF
                     pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+
+                    // Tempel signature memakai posisi aktual terakhir setelah drag.
+                    signatureLayers.forEach((signature) => {
+                        pdf.addImage(
+                            signature.imageData,
+                            "PNG",
+                            signature.leftRatio * imgWidth,
+                            signature.topRatio * imgHeight,
+                            signature.widthRatio * imgWidth,
+                            signature.heightRatio * imgHeight,
+                        );
+                    });
+
+                    // Tempel gambar upload dengan ukuran dan posisi aktual di paper.
+                    uploadedImageLayers.forEach((uploadedImage) => {
+                        pdf.addImage(
+                            uploadedImage.imageData,
+                            "PNG",
+                            uploadedImage.leftRatio * imgWidth,
+                            uploadedImage.topRatio * imgHeight,
+                            uploadedImage.widthRatio * imgWidth,
+                            uploadedImage.heightRatio * imgHeight,
+                        );
+                    });
                 }
 
                 // Output PDF sebagai Blob yang valid
@@ -730,19 +1154,48 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                         <HardDrive className="w-3 h-3" /> Export
                     </label>
                     <div className="flex items-center gap-1.5">
-                        <button
+                        {/* <button
                             onClick={() => downloadPaper("docx")}
                             disabled={!isDownload}
                             className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all duration-200 flex items-center gap-2 ${isDownload ? "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 active:scale-95" : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}`}
                         >
                             <DockIcon className="w-3 h-3" /> DOCX
-                        </button>
+                        </button> */}
                         <button
                             onClick={handleSaveToLibraDrive}
                             disabled={!isDownload}
                             className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all duration-200 flex items-center gap-2 ${isDownload ? "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 active:scale-95" : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}`}
                         >
                             <Server className="w-3 h-3" /> Drive
+                        </button>
+                    </div>
+                </div>
+
+                {/* 6. Tanda Tangan (Signature) */}
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[10px] uppercase tracking-wider font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 flex items-center gap-1.5">
+                        <Pen className="w-3 h-3" /> Signature
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={createSignature}
+                            disabled={!isDownload}
+                            className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all duration-200 flex items-center gap-2 ${isDownload ? "border-[#0D0606]/20 dark:border-[#D9E4D1]/20 bg-[#D9E4D1] dark:bg-[#0D0606] hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/5 active:scale-95" : "border-transparent bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-zinc-400 cursor-pointer"}`}
+                        >
+                            <Pen className="w-3 h-3" /> Signature
+                        </button>
+                        <button
+                            onClick={Deletesignature}
+                            disabled={!hasSelectedSignature || !deletesignature}
+                            title={hasSelectedSignature ? "Hapus signature yang dipilih" : "Pilih signature di paper terlebih dahulu"}
+                            className={`rounded-lg border p-2 transition-all duration-200 active:scale-95 ${
+                                hasSelectedSignature && deletesignature
+                                    ? "border-red-500/30 bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400"
+                                    : "cursor-not-allowed border-transparent bg-[#0D0606]/5 text-[#0D0606]/25 dark:bg-[#D9E4D1]/5 dark:text-[#D9E4D1]/25"
+                            }`}
+                            aria-label="Hapus signature yang dipilih"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
                         </button>
                     </div>
                 </div>
@@ -765,6 +1218,104 @@ export function SidebarRight({ onImageUpload }: SidebarRightProps) {
                 onClose={() => setIsAuthModalOpen(false)}
                 initialType={authModalType}
             />
+
+            {/* Modal Canvas Tanda Tangan */}
+            <AnimatePresence>
+                {isSignatureModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onMouseDown={(event) => {
+                            if (event.target === event.currentTarget) {
+                                setIsSignatureModalOpen(false);
+                            }
+                        }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center bg-[#0D0606]/55 px-4 backdrop-blur-sm"
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, y: 18, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+                            transition={{ duration: 0.2 }}
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="signature-modal-title"
+                            className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/50 bg-[#F7F9F5] shadow-2xl dark:border-white/10 dark:bg-[#171211]"
+                        >
+                            <div className="flex items-start justify-between border-b border-[#0D0606]/10 px-6 py-5 dark:border-[#D9E4D1]/10">
+                                <div>
+                                    <div className="mb-1 flex items-center gap-2">
+                                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#0D0606] text-[#D9E4D1] dark:bg-[#D9E4D1] dark:text-[#0D0606]">
+                                            <Pen className="h-4 w-4" />
+                                        </span>
+                                        <h3 id="signature-modal-title" className="text-lg font-semibold text-[#0D0606] dark:text-[#D9E4D1]">
+                                            Buat Tanda Tangan
+                                        </h3>
+                                    </div>
+                                    <p className="pl-11 text-xs text-[#0D0606]/55 dark:text-[#D9E4D1]/55">
+                                        Gambar dengan mouse, trackpad, atau sentuhan.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSignatureModalOpen(false)}
+                                    aria-label="Tutup modal tanda tangan"
+                                    className="rounded-xl p-2 text-[#0D0606]/55 transition hover:bg-[#0D0606]/5 hover:text-[#0D0606] dark:text-[#D9E4D1]/55 dark:hover:bg-[#D9E4D1]/10 dark:hover:text-[#D9E4D1]"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+
+                            <div className="p-6">
+                                <div className="relative overflow-hidden rounded-2xl border border-[#0D0606]/15 bg-white shadow-inner">
+                                    <canvas
+                                        ref={signatureCanvasRef}
+                                        onPointerDown={handleSignaturePointerDown}
+                                        onPointerMove={handleSignaturePointerMove}
+                                        onPointerUp={handleSignaturePointerUp}
+                                        onPointerCancel={handleSignaturePointerUp}
+                                        onPointerLeave={handleSignaturePointerUp}
+                                        className="block h-64 w-full cursor-crosshair touch-none"
+                                        aria-label="Canvas untuk menggambar tanda tangan"
+                                    />
+                                    <div className="pointer-events-none absolute inset-x-8 bottom-12 border-b border-dashed border-[#0D0606]/20" />
+                                    {!hasSignatureStroke && (
+                                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                            <span className="rounded-full bg-[#0D0606]/5 px-4 py-2 text-xs text-[#0D0606]/35">
+                                                Tanda tangan di area ini
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+                                    <button
+                                        type="button"
+                                        onClick={clearSignatureCanvas}
+                                        className="rounded-xl border border-[#0D0606]/15 px-5 py-3 text-sm font-medium text-[#0D0606]/70 transition hover:bg-[#0D0606]/5 active:scale-[0.98] dark:border-[#D9E4D1]/15 dark:text-[#D9E4D1]/70 dark:hover:bg-[#D9E4D1]/5"
+                                    >
+                                        Hapus & Ulangi
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={applySignatureToPaper}
+                                        disabled={!hasSignatureStroke}
+                                        className={`flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition active:scale-[0.98] ${
+                                            hasSignatureStroke
+                                                ? "bg-[#0D0606] text-[#D9E4D1] shadow-lg hover:opacity-90 dark:bg-[#D9E4D1] dark:text-[#0D0606]"
+                                                : "cursor-not-allowed bg-[#0D0606]/10 text-[#0D0606]/30 dark:bg-[#D9E4D1]/10 dark:text-[#D9E4D1]/30"
+                                        }`}
+                                    >
+                                        <CheckCircle className="h-4 w-4" />
+                                        Terapkan ke Paper
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Modal Save to LibraDrive */}
             <AnimatePresence>
