@@ -6,9 +6,10 @@ import { useEffect, useState, useRef } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Authentication } from "../firebase/firebase.configuration";
 import { AuthModal, AuthType } from "./AuthModal";
+import { SaveSettings, RestoreSettings } from "./autosave";
 
 // Library untuk generate file DOCX & PDF yang valid
-import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, SectionType, ShadingType, UnderlineType } from "docx";
+import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, SectionType, ShadingType, UnderlineType, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType, LineRuleType } from "docx";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -74,6 +75,8 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
     const [deletesignature, setdeletesignature] = useState(true);
     const [hasSelectedSignature, setHasSelectedSignature] = useState(false);
     const selectedSignatureRef = useRef<HTMLElement | null>(null);
+    //Daftar signature yang event drag-nya sudah dipasang
+    const boundSignaturesRef = useRef<WeakSet<HTMLElement>>(new WeakSet());
 
     const [uploadImage, setUploadImage] = useState<string | null>(null);
 
@@ -255,6 +258,21 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
         signatureContainer.style.left = `${Math.max(0, targetEditor.clientWidth - 308)}px`;
         signatureContainer.style.top = `${Math.max(0, targetEditor.clientHeight - 164)}px`;
 
+        enableSignatureDragging(signatureContainer, targetEditor);
+
+        targetEditor.dispatchEvent(new Event("input", { bubbles: true }));
+        setIsSignatureModalOpen(false);
+    };
+
+    // Pasang perilaku geser pada satu signature. Dipisah menjadi fungsi sendiri
+    // karena signature hasil restore localStorage hanya berupa HTML: event
+    // listener-nya ikut hilang dan harus dipasang ulang.
+    const enableSignatureDragging = (signatureContainer: HTMLElement, targetEditor: HTMLElement) => {
+        // WeakSet dipakai (bukan atribut data) supaya penanda ini tidak ikut
+        // tersimpan ke innerHTML dan menipu proses restore berikutnya.
+        if (boundSignaturesRef.current.has(signatureContainer)) return;
+        boundSignaturesRef.current.add(signatureContainer);
+
         // Signature menjadi objek paper yang dapat dipindahkan dengan pointer.
         signatureContainer.addEventListener("pointerdown", (pointerDownEvent) => {
             pointerDownEvent.preventDefault();
@@ -294,10 +312,59 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
             signatureContainer.addEventListener("pointerup", stopMovingSignature);
             signatureContainer.addEventListener("pointercancel", stopMovingSignature);
         });
-
-        targetEditor.dispatchEvent(new Event("input", { bubbles: true }));
-        setIsSignatureModalOpen(false);
     };
+
+    // Effect: signature hasil restore localStorage masuk sebagai HTML mentah,
+    // jadi tidak punya listener drag. Pantau kertas dan pasangi ulang setiap
+    // signature yang belum terpasang.
+    useEffect(() => {
+        const bindSignaturesOnPaper = () => {
+            document.querySelectorAll<HTMLElement>("[data-signature='true']").forEach((signatureElement) => {
+                const targetEditor = signatureElement.closest<HTMLElement>("[id^='main-editor-']");
+                if (!targetEditor) return;
+
+                // Wadah signature juga perlu dipastikan tidak ikut diedit sebagai teks
+                signatureElement.contentEditable = "false";
+                signatureElement.style.cursor = "grab";
+                signatureElement.style.touchAction = "none";
+                signatureElement.style.userSelect = "none";
+
+                enableSignatureDragging(signatureElement, targetEditor);
+            });
+        };
+
+        bindSignaturesOnPaper();
+
+        // Hanya pindai ulang saat benar-benar ada elemen baru masuk ke halaman,
+        // supaya mengetik biasa tidak memicu pemindaian terus-menerus.
+        const observer = new MutationObserver((mutations) => {
+            const adaElemenBaru = mutations.some((mutation) =>
+                Array.from(mutation.addedNodes).some((node) => node instanceof HTMLElement));
+            if (adaElemenBaru) bindSignaturesOnPaper();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        return () => observer.disconnect();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Effect: tombol Delete menghapus signature yang sedang dipilih.
+    // Backspace sengaja tidak dipakai supaya tidak bentrok saat user mengetik.
+    useEffect(() => {
+        const handleDeleteKey = (event: KeyboardEvent) => {
+            if (event.key !== "Delete") return;
+            if (!selectedSignatureRef.current) return;
+
+            // Jangan hapus signature kalau kursor sedang berada di dalam naskah
+            const active = document.activeElement;
+            if (active instanceof HTMLElement && active.isContentEditable) return;
+
+            Deletesignature();
+        };
+
+        document.addEventListener("keydown", handleDeleteKey);
+        return () => document.removeEventListener("keydown", handleDeleteKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     //Untuk menghapus signature (tanda tangan)
     const Deletesignature = () => {
@@ -425,9 +492,26 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
                     return AlignmentType.LEFT;
                 };
 
+                // background-color bukan properti yang diwariskan di CSS, jadi elemen
+                // terdalam bisa saja transparan walaupun highlight dipasang di elemen
+                // induknya (misal <span highlight><font color>teks</font></span>).
+                // Telusuri ke atas sampai ketemu warna latar yang benar-benar terisi.
+                const findHighlightColor = (element: HTMLElement, root: HTMLElement): string | undefined => {
+                    let current: HTMLElement | null = element;
+
+                    while (current) {
+                        const background = cssColorToHex(window.getComputedStyle(current).backgroundColor);
+                        if (background) return background;
+                        if (current === root) return undefined; // jangan ambil warna kertas
+                        current = current.parentElement;
+                    }
+
+                    return undefined;
+                };
+
                 // Buat TextRun per text node agar format inline (font, size, warna,
                 // highlight, bold, italic, underline) tidak hilang atau pecah baris.
-                const textNodeToRun = (node: Node): TextRun | null => {
+                const textNodeToRun = (node: Node, root: HTMLElement): TextRun | null => {
                     const text = node.textContent?.replace(/\u00a0/g, " ");
                     const parent = node.parentElement;
                     if (!text || !parent) return null;
@@ -436,7 +520,7 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
                     const fontSizePx = Number.parseFloat(style.fontSize) || 16;
                     const fontWeight = Number.parseInt(style.fontWeight, 10);
                     const color = cssColorToHex(style.color);
-                    const background = cssColorToHex(style.backgroundColor);
+                    const background = findHighlightColor(parent, root);
                     const fontFamily = style.fontFamily
                         .split(",")[0]
                         .trim()
@@ -466,7 +550,7 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
 
                 // Fungsi helper: konversi HTML menjadi Paragraph tanpa menjadikan
                 // setiap <span>/<font>/<b> sebagai paragraf baru.
-                const htmlToParagraphs = (element: HTMLElement): Paragraph[] => {
+                const htmlToParagraphs = (element: HTMLElement, root: HTMLElement = element): Paragraph[] => {
                     const paragraphs: Paragraph[] = [];
                     let currentRuns: TextRun[] = [];
 
@@ -482,7 +566,7 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
 
                     const collectInlineRuns = (node: Node) => {
                         if (node.nodeType === Node.TEXT_NODE) {
-                            const run = textNodeToRun(node);
+                            const run = textNodeToRun(node, root);
                             if (run) currentRuns.push(run);
                             return;
                         }
@@ -511,7 +595,7 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
                                     flushParagraph(item as HTMLElement);
                                 });
                             } else if (Array.from(node.children).some((child) => blockTags.has(child.tagName.toLowerCase()))) {
-                                paragraphs.push(...htmlToParagraphs(node));
+                                paragraphs.push(...htmlToParagraphs(node, root));
                             } else {
                                 collectInlineRuns(node);
                                 flushParagraph(node);
@@ -530,18 +614,58 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
 
                     // Canvas disimpan sebagai PNG dan dimasukkan sebagai gambar asli
                     // agar signature tetap terlihat pada DOCX di LibraDrive.
+                    // Signature dipasang sebagai gambar mengambang memakai koordinat
+                    // terakhirnya di kertas, bukan paragraf yang mengalir mengikuti
+                    // teks, supaya posisinya sama dengan yang terlihat di layar.
+                    const pageRect = pageDom.getBoundingClientRect();
+
+                    // Ukuran halaman pada properti section: 11906 x 16838 twip.
+                    // 1 twip = 635 EMU, dan 1 px layar (96 dpi) = 9525 EMU.
+                    const pageWidthEmu = 11906 * 635;
+                    const pageHeightEmu = 16838 * 635;
+                    const emuPerPixel = 9525;
+
                     pageDom.querySelectorAll<HTMLImageElement>("img[data-signature-image='true']").forEach((image) => {
                         const imageBytes = pngDataUrlToBytes(image.src);
                         if (imageBytes.length === 0) return;
+                        if (pageRect.width === 0 || pageRect.height === 0) return;
 
-                        paragraphs.push(new Paragraph({
-                            alignment: AlignmentType.RIGHT,
-                            spacing: { before: 160, after: 0 },
+                        // Ukur wadah signature, karena itu yang digeser saat drag.
+                        const signatureElement = image.closest<HTMLElement>("[data-signature='true']") ?? image;
+                        const signatureRect = signatureElement.getBoundingClientRect();
+
+                        // Ubah posisi & ukuran di layar menjadi rasio terhadap kertas,
+                        // lalu terjemahkan ke koordinat halaman DOCX.
+                        const leftRatio = (signatureRect.left - pageRect.left) / pageRect.width;
+                        const topRatio = (signatureRect.top - pageRect.top) / pageRect.height;
+                        const widthRatio = signatureRect.width / pageRect.width;
+                        const heightRatio = signatureRect.height / pageRect.height;
+
+                        paragraphs.unshift(new Paragraph({
+                            // Paragraf jangkar dibuat setinggi 1 twip agar tidak
+                            // menambah baris kosong di atas naskah.
+                            spacing: { before: 0, after: 0, line: 1, lineRule: LineRuleType.EXACT },
                             children: [
                                 new ImageRun({
                                     data: imageBytes,
-                                    transformation: { width: 260, height: 100 },
                                     type: "png",
+                                    transformation: {
+                                        width: Math.max(1, Math.round((widthRatio * pageWidthEmu) / emuPerPixel)),
+                                        height: Math.max(1, Math.round((heightRatio * pageHeightEmu) / emuPerPixel)),
+                                    },
+                                    floating: {
+                                        horizontalPosition: {
+                                            relative: HorizontalPositionRelativeFrom.PAGE,
+                                            offset: Math.max(0, Math.round(leftRatio * pageWidthEmu)),
+                                        },
+                                        verticalPosition: {
+                                            relative: VerticalPositionRelativeFrom.PAGE,
+                                            offset: Math.max(0, Math.round(topRatio * pageHeightEmu)),
+                                        },
+                                        allowOverlap: true,
+                                        behindDocument: false,
+                                        wrap: { type: TextWrappingType.NONE },
+                                    },
                                 }),
                             ],
                         }));
@@ -796,6 +920,21 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
         { value: "13x18", label: "13x18 cm", width: "491px" },
         { value: "quarto", label: "Quarto", width: "768px" },
         { value: "ledger", label: "Ledger", width: "1632px" },
+        { value: "a7", label: "A7 (74 x 105 mm)", width: "280px" },
+        { value: "a8", label: "A8 (52 x 74 mm)", width: "197px" },
+        { value: "b7", label: "B7 (88 x 125 mm)", width: "333px" },
+        { value: "c3", label: "C3 (324 x 458 mm)", width: "1225px" },
+        { value: "c7", label: "C7 (81 x 114 mm)", width: "306px" },
+        { value: "kwarto", label: "Kwarto (215 x 275 mm)", width: "813px" },
+        { value: "a4-landscape", label: "A4 Landscape (297 x 210 mm)", width: "1123px" },
+        { value: "junior-legal", label: "Junior Legal (5 x 8 in)", width: "480px" },
+        { value: "government-letter", label: "Government Letter (8 x 10.5 in)", width: "768px" },
+        { value: "us-trade", label: "US Trade Book (6 x 9 in)", width: "576px" },
+        { value: "demy", label: "Demy (5.375 x 8.375 in)", width: "516px" },
+        { value: "royal", label: "Royal (6.14 x 9.21 in)", width: "590px" },
+        { value: "pocket-book", label: "Pocket Book (4.25 x 6.87 in)", width: "408px" },
+        { value: "comic", label: "Comic Book (6.625 x 10.25 in)", width: "636px" },
+        { value: "square-210", label: "Square (210 x 210 mm)", width: "794px" },
     ];
 
     const downloadPaper = async (type: "pdf" | "docx") => {
@@ -939,6 +1078,27 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
         if (selectedPaper) {
             document.documentElement.style.setProperty('--paper-max-width', selectedPaper.width);
         }
+    }, [paperColor, paperType]);
+
+    //Penanda pengaturan kertas sudah selesai dipulihkan
+    const isPaperRestoredRef = useRef(false);
+
+    // Effect: pulihkan pengaturan kertas terakhir saat halaman dibuka kembali
+    useEffect(() => {
+        const saved = RestoreSettings<{ paperColor: string; paperType: string }>("paper");
+        if (saved) {
+            if (saved.paperColor) setPaperColor(saved.paperColor);
+            if (saved.paperType) setPaperType(saved.paperType);
+        }
+        isPaperRestoredRef.current = true;
+    }, []);
+
+    // Effect: simpan pengaturan kertas setiap kali diubah
+    useEffect(() => {
+        // Jangan menimpa pengaturan tersimpan dengan nilai default saat mount
+        if (!isPaperRestoredRef.current) return;
+
+        SaveSettings("paper", { paperColor, paperType });
     }, [paperColor, paperType]);
 
     //fungsi upload image

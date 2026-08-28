@@ -7,6 +7,7 @@ import { Search, Send, X, Plus, Minus, FileText, BookOpen, GraduationCap, Newspa
 import { useState, useRef, useEffect, useCallback } from "react";
 import Markdown from "markdown-to-jsx";
 import { Analytics } from "@vercel/analytics/next"
+import { AutoSave, RestoreAutoSave, type UploadedImage } from "@/components/autosave";
 
 export default function Home() {
   // State untuk melacak apakah input sedang fokus (diklik)
@@ -206,8 +207,120 @@ export default function Home() {
     };
   }, [pageNumber, checkOverflow]);
 
+  // Ref penanda: konten tersimpan sudah selesai dikembalikan ke editor
+  const isRestoredRef = useRef(false);
+  // Ref penampung konten hasil restore yang menunggu halaman selesai dirender
+  const pendingRestoreRef = useRef<string[] | null>(null);
+  // Ref untuk timer autosave (dipakai debounce: timer lama dibatalkan saat user masih mengetik)
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ref berisi gambar upload terbaru, supaya autosave tidak membaca nilai basi
+  const uploadedImagesRef = useRef<UploadedImage[]>([]);
+
+  // Jadwalkan autosave dengan debounce. Dipakai oleh perubahan naskah maupun gambar.
+  const scheduleAutoSave = useCallback(() => {
+    // Jangan menimpa naskah tersimpan sebelum proses restore selesai
+    if (!isRestoredRef.current) return;
+
+    // Debounce: batalkan jadwal sebelumnya supaya simpan hanya saat user berhenti
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = AutoSave(pageNumberRef.current, uploadedImagesRef.current);
+  }, []);
+
+  // Effect: baca naskah tersimpan dari localStorage saat halaman pertama kali dibuka
+  useEffect(() => {
+    const savedDocument = RestoreAutoSave();
+
+    // Tidak ada naskah tersimpan, langsung izinkan autosave berjalan
+    if (!savedDocument || savedDocument.halaman.length === 0) {
+      isRestoredRef.current = true;
+      return;
+    }
+
+    // Gambar upload hidup di React state, bukan di innerHTML editor,
+    // jadi harus dipulihkan terpisah dari naskah.
+    setUploadedImages(savedDocument.images);
+    uploadedImagesRef.current = savedDocument.images;
+
+    // Simpan konten dulu, lalu siapkan jumlah halaman sesuai naskah terakhir
+    pendingRestoreRef.current = savedDocument.halaman;
+    setPageNumber(Math.max(1, savedDocument.pageNumber));
+  }, []);
+
+  // Effect: isi ulang editor setelah halaman hasil restore selesai dirender
+  useEffect(() => {
+    const savedPages = pendingRestoreRef.current;
+    if (!savedPages) return;
+    if (pageNumber < savedPages.length) return; // tunggu sampai semua halaman tersedia
+
+    const frame = requestAnimationFrame(() => {
+      savedPages.forEach((content, index) => {
+        const editor = document.getElementById(`main-editor-${index}`);
+        if (editor) editor.innerHTML = content;
+      });
+
+      pendingRestoreRef.current = null;
+      isRestoredRef.current = true;
+      setToast({ message: "The saved file was successfully restored", visible: true });
+      setTimeout(() => setToast({ message: "", visible: false }), 3000);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [pageNumber]);
+
+  // Effect: pasang pemicu autosave di setiap editor (ketikan user maupun sisipan dari AI)
+  useEffect(() => {
+    const listeners: { editor: HTMLElement; handler: () => void }[] = [];
+    const observers: MutationObserver[] = [];
+
+    for (let i = 0; i < pageNumber; i++) {
+      const editor = document.getElementById(`main-editor-${i}`);
+      if (!editor) continue;
+
+      editor.addEventListener('input', scheduleAutoSave);
+      listeners.push({ editor, handler: scheduleAutoSave });
+
+      const observer = new MutationObserver(scheduleAutoSave);
+      observer.observe(editor, { childList: true, subtree: true, characterData: true });
+      observers.push(observer);
+    }
+
+    return () => {
+      listeners.forEach(({ editor, handler }) => editor.removeEventListener('input', handler));
+      observers.forEach((observer) => observer.disconnect());
+    };
+  }, [pageNumber, scheduleAutoSave]);
+
   // State untuk menyimpan gambar yang diupload ke atas kertas
-  const [uploadedImages, setUploadedImages] = useState<{ id: string; src: string; x: number; y: number }[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  // Gambar yang sedang dipilih, supaya bisa dihapus dengan tombol Delete
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+
+  // Effect: gambar hidup di React state, jadi perubahannya (tambah, geser, hapus)
+  // harus ikut memicu autosave sendiri karena tidak menyentuh DOM editor.
+  useEffect(() => {
+    uploadedImagesRef.current = uploadedImages;
+    scheduleAutoSave();
+  }, [uploadedImages, scheduleAutoSave]);
+
+  // Effect: tombol Delete menghapus gambar yang sedang dipilih.
+  // Sengaja tidak memakai Backspace supaya tidak bentrok saat user mengetik.
+  useEffect(() => {
+    if (!selectedImageId) return;
+
+    const handleDeleteKey = (event: KeyboardEvent) => {
+      if (event.key !== "Delete") return;
+
+      // Jangan hapus gambar kalau kursor sedang berada di dalam naskah
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.isContentEditable) return;
+
+      setUploadedImages((prev) => prev.filter((image) => image.id !== selectedImageId));
+      setSelectedImageId(null);
+    };
+
+    document.addEventListener("keydown", handleDeleteKey);
+    return () => document.removeEventListener("keydown", handleDeleteKey);
+  }, [selectedImageId]);
 
   // Fungsi yang dipanggil saat ada gambar yang diupload dari SidebarRight
   const handleImageUpload = (src: string) => {
@@ -997,6 +1110,14 @@ export default function Home() {
                     drag
                     dragMomentum={false}
                     initial={{ x: img.x, y: img.y }}
+                    // Posisi hasil geser disimpan ke state supaya ikut terbawa autosave.
+                    // initial hanya berlaku saat mount, jadi tidak menimpa posisi drag.
+                    onDragEnd={(event, info) => {
+                      setUploadedImages((prev) => prev.map((item) => item.id === img.id
+                        ? { ...item, x: item.x + info.offset.x, y: item.y + info.offset.y }
+                        : item));
+                    }}
+                    onPointerDown={() => setSelectedImageId(img.id)}
                     className="absolute z-50 cursor-move group"
                     style={{ touchAction: "none" }}
                   >
@@ -1005,7 +1126,10 @@ export default function Home() {
                         src={img.src}
                         alt="Uploaded content"
                         data-paper-uploaded-image="true"
-                        className="max-w-[300px] max-h-[300px] object-contain rounded-lg shadow-sm border border-transparent group-hover:border-zinc-300 dark:group-hover:border-zinc-700 transition-colors pointer-events-auto"
+                        className={`max-w-[300px] max-h-[300px] object-contain rounded-lg shadow-sm border transition-colors pointer-events-auto ${selectedImageId === img.id
+                          ? "border-blue-500 dark:border-blue-400"
+                          : "border-transparent group-hover:border-zinc-300 dark:group-hover:border-zinc-700"
+                          }`}
                         draggable={false} // Mencegah perilaku drag bawaan browser pada gambar
                       />
                       {/* Delete button (only visible on hover) */}

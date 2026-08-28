@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
         //Konfigurasi Sistem
         const ConfigurationSystem = new OpenAI({
             //BaseURL
-            baseURL: 'https://api.deepseek.com',
+            baseURL: process.env.NEXT_PUBLIC_LIBRAAI_BASE_URL,
 
             //Kunci API
             apiKey: process.env.NEXT_PUBLIC_LIBRAAI_API_KEY,

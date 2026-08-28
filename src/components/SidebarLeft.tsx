@@ -1,9 +1,61 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Settings, Type, List, AlignLeft, AlignCenter, AlignRight, AlignJustify, Moon, Sun, Palette, Bold, Italic, Underline, Strikethrough } from "lucide-react";
-import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Settings, Type, List, AlignLeft, AlignCenter, AlignRight, AlignJustify, Moon, Sun, Palette, Bold, Italic, Underline, Strikethrough, MoreHorizontal, Check } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
+import { SaveSettings, RestoreSettings } from "@/components/autosave";
+
+//bentuk pengaturan font yang ikut disimpan ke localstorage
+type FontSettings = {
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  textAlign: string;
+  fontColor: string;
+};
+
+// Daftar font tambahan yang diakses lewat tombol titik tiga.
+// hasBold = font punya berat 700 asli di Google Fonts (kalau tidak, browser yang menebalkan sendiri)
+const EXTRA_FONTS: { name: string; category: "Profesional" | "Imut"; hasBold: boolean }[] = [
+  // --- Profesional ---
+  { name: "Roboto", category: "Profesional", hasBold: true },
+  { name: "Open Sans", category: "Profesional", hasBold: true },
+  { name: "Lato", category: "Profesional", hasBold: true },
+  { name: "Montserrat", category: "Profesional", hasBold: true },
+  { name: "Poppins", category: "Profesional", hasBold: true },
+  { name: "Work Sans", category: "Profesional", hasBold: true },
+  { name: "Nunito Sans", category: "Profesional", hasBold: true },
+  { name: "Source Serif 4", category: "Profesional", hasBold: true },
+  { name: "Merriweather", category: "Profesional", hasBold: true },
+  { name: "Playfair Display", category: "Profesional", hasBold: true },
+  { name: "Libre Baskerville", category: "Profesional", hasBold: true },
+  { name: "EB Garamond", category: "Profesional", hasBold: true },
+  { name: "Lora", category: "Profesional", hasBold: true },
+  { name: "PT Serif", category: "Profesional", hasBold: true },
+  { name: "IBM Plex Serif", category: "Profesional", hasBold: true },
+  // --- Imut ---
+  { name: "Quicksand", category: "Imut", hasBold: true },
+  { name: "Comfortaa", category: "Imut", hasBold: true },
+  { name: "Baloo 2", category: "Imut", hasBold: true },
+  { name: "Fredoka", category: "Imut", hasBold: true },
+  { name: "Nunito", category: "Imut", hasBold: true },
+  { name: "Grandstander", category: "Imut", hasBold: true },
+  { name: "Caveat", category: "Imut", hasBold: true },
+  { name: "Pacifico", category: "Imut", hasBold: false },
+  { name: "Patrick Hand", category: "Imut", hasBold: false },
+  { name: "Indie Flower", category: "Imut", hasBold: false },
+  { name: "Shadows Into Light", category: "Imut", hasBold: false },
+  { name: "Gloria Hallelujah", category: "Imut", hasBold: false },
+  { name: "Chewy", category: "Imut", hasBold: false },
+  { name: "Bubblegum Sans", category: "Imut", hasBold: false },
+  { name: "Schoolbell", category: "Imut", hasBold: false },
+];
+
+// Susun satu URL Google Fonts untuk semua font tambahan sekaligus
+const EXTRA_FONTS_HREF = `https://fonts.googleapis.com/css2?${EXTRA_FONTS
+  .map((font) => `family=${font.name.replace(/ /g, "+")}${font.hasBold ? ":wght@400;700" : ""}`)
+  .join("&")}&display=swap`;
 
 export function SidebarLeft() {
   // Kumpulan State untuk menyimpan pengaturan gaya tulisan dan warna saat ini
@@ -14,6 +66,13 @@ export function SidebarLeft() {
   const { theme, setTheme } = useTheme(); // Hook untuk mengubah mode Terang/Gelap
   const [mounted, setMounted] = useState(false);
   const [fontColor, setFontColor] = useState("#000000");
+
+  //State untuk panel font tambahan (dibuka lewat tombol titik tiga)
+  const [isMoreFontsOpen, setIsMoreFontsOpen] = useState(false);
+  const [fontCategory, setFontCategory] = useState<"Profesional" | "Imut">("Profesional");
+  const moreFontsRef = useRef<HTMLDivElement>(null);
+  //Penanda pengaturan tersimpan sudah selesai dipulihkan
+  const isSettingsRestoredRef = useRef(false);
 
   //Kumpulan state untuk advanced
   const [isBold, setIsBold] = useState(false);
@@ -98,6 +157,74 @@ export function SidebarLeft() {
     setFontColor(color);
   };
 
+  // Effect: unduh stylesheet Google Fonts sekali saja, saat panel font tambahan pertama kali dibuka
+  useEffect(() => {
+    if (!isMoreFontsOpen) return;
+    if (document.getElementById("gravity-extra-fonts")) return;
+
+    const link = document.createElement("link");
+    link.id = "gravity-extra-fonts";
+    link.rel = "stylesheet";
+    link.href = EXTRA_FONTS_HREF;
+    document.head.appendChild(link);
+  }, [isMoreFontsOpen]);
+
+  // Effect: tutup panel font tambahan saat user klik di luar panel
+  useEffect(() => {
+    if (!isMoreFontsOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreFontsRef.current && !moreFontsRef.current.contains(event.target as Node)) {
+        setIsMoreFontsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMoreFontsOpen]);
+
+  // Terapkan font ke naskah (dipakai tombol font bawaan maupun font tambahan)
+  const applyFontFamily = (font: string) => {
+    setFontFamily(font);
+
+    // Font juga dipasang sebagai font dasar editor lewat CSS variable, supaya
+    // tetap berlaku walaupun tidak ada teks yang sedang diseleksi.
+    // Teks yang sudah diberi font sendiri lewat execCommand tetap menang.
+    document.documentElement.style.setProperty(
+      "--editor-font-family",
+      font === "Times New Roman" ? "'Times New Roman', serif" : `'${font}', sans-serif`
+    );
+
+    const editor = document.getElementById("main-editor");
+    if (editor && document.activeElement !== editor) editor.focus();
+    document.execCommand("fontName", false, font === "Times New Roman" ? "Times New Roman, serif" : font);
+  };
+
+  // Effect: pulihkan pengaturan font terakhir saat halaman dibuka kembali
+  useEffect(() => {
+    const saved = RestoreSettings<FontSettings>("font");
+    if (!saved) {
+      isSettingsRestoredRef.current = true;
+      return;
+    }
+
+    if (saved.fontFamily) applyFontFamily(saved.fontFamily);
+    if (typeof saved.fontSize === "number") setFontSize(saved.fontSize);
+    if (typeof saved.fontWeight === "number") setFontWeight(saved.fontWeight);
+    if (saved.textAlign) setTextAlign(saved.textAlign);
+    if (saved.fontColor) setFontColor(saved.fontColor);
+
+    isSettingsRestoredRef.current = true;
+  }, []);
+
+  // Effect: simpan pengaturan font setiap kali ada yang diubah
+  useEffect(() => {
+    // Jangan menimpa pengaturan tersimpan dengan nilai default saat mount
+    if (!isSettingsRestoredRef.current) return;
+
+    SaveSettings("font", { fontFamily, fontSize, fontWeight, textAlign, fontColor });
+  }, [fontFamily, fontSize, fontWeight, textAlign, fontColor]);
+
   // Function untuk format teks advanced (dipanggil di tombol sidebar)
   const setAdvanced = (command: string) => {
     // Fokuskan ke editor jika belum fokus (agar bisa ngetik setelah klik sidebar)
@@ -132,12 +259,7 @@ export function SidebarLeft() {
               <button
                 key={font}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  setFontFamily(font);
-                  const editor = document.getElementById("main-editor");
-                  if (editor && document.activeElement !== editor) editor.focus();
-                  document.execCommand("fontName", false, font === "Times New Roman" ? "Times New Roman, serif" : font);
-                }}
+                onClick={() => applyFontFamily(font)}
                 className={`px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${fontFamily === font
                   ? "bg-[#0D0606] text-[#D9E4D1] dark:bg-[#D9E4D1] dark:text-[#0D0606] font-bold shadow-sm"
                   : "text-[#0D0606] dark:text-[#D9E4D1] hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10"
@@ -147,6 +269,74 @@ export function SidebarLeft() {
                 {font}
               </button>
             ))}
+
+            {/* Tombol titik tiga untuk membuka 30 font tambahan */}
+            <div ref={moreFontsRef} className="relative shrink-0">
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setIsMoreFontsOpen((prev) => !prev)}
+                title="Font lainnya"
+                className={`px-2 py-1.5 rounded-md transition-all duration-200 flex items-center ${isMoreFontsOpen || EXTRA_FONTS.some((f) => f.name === fontFamily)
+                  ? "bg-[#0D0606] text-[#D9E4D1] dark:bg-[#D9E4D1] dark:text-[#0D0606] shadow-sm"
+                  : "text-[#0D0606] dark:text-[#D9E4D1] hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10"
+                  }`}
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+
+              {/* Panel font tambahan. Posisinya fixed supaya tidak terpotong toolbar yang bisa discroll */}
+              <AnimatePresence>
+                {isMoreFontsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
+                    className="fixed top-[4.5rem] md:top-[5.5rem] left-1/2 -translate-x-1/2 w-[92vw] max-w-md bg-white/95 dark:bg-[#0D0606]/95 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-2xl shadow-2xl z-50 p-3"
+                  >
+                    {/* Pemilih kategori: Profesional atau Imut */}
+                    <div className="flex items-center gap-1 p-1 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 rounded-lg mb-2">
+                      {(["Profesional", "Imut"] as const).map((category) => (
+                        <button
+                          key={category}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setFontCategory(category)}
+                          className={`flex-1 px-3 py-1.5 rounded-md text-xs transition-all duration-200 ${fontCategory === category
+                            ? "bg-[#0D0606] text-[#D9E4D1] dark:bg-[#D9E4D1] dark:text-[#0D0606] font-bold shadow-sm"
+                            : "text-[#0D0606] dark:text-[#D9E4D1] hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10"
+                            }`}
+                        >
+                          {category}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Daftar font sesuai kategori, tiap tombol tampil memakai fontnya sendiri */}
+                    <div className="max-h-64 overflow-y-auto scrollbar-hide flex flex-col gap-0.5">
+                      {EXTRA_FONTS.filter((font) => font.category === fontCategory).map((font) => (
+                        <button
+                          key={font.name}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            applyFontFamily(font.name);
+                            setIsMoreFontsOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left transition-colors ${fontFamily === font.name
+                            ? "bg-[#0D0606] text-[#D9E4D1] dark:bg-[#D9E4D1] dark:text-[#0D0606]"
+                            : "text-[#0D0606] dark:text-[#D9E4D1] hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10"
+                            }`}
+                        >
+                          <span className="text-base truncate" style={{ fontFamily: `'${font.name}', sans-serif` }}>
+                            {font.name}
+                          </span>
+                          {fontFamily === font.name && <Check className="w-4 h-4 shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 
