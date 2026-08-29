@@ -141,7 +141,11 @@ export default function NewDocument() {
 
   //efek tombol add paper
   const handleAddPaper = () => {
-    setPageNumber((prev) => prev + 1);
+    setPageNumber((prev) => {
+      //halaman kosong yang sengaja ditambah user tidak boleh dibuang paginasi
+      minPagesRef.current = prev + 1;
+      return prev + 1;
+    });
   };
 
   //efek tombol delete paper
@@ -165,6 +169,8 @@ export default function NewDocument() {
       lastEditor.innerHTML = '';
     }
 
+    //turunkan juga batas bawahnya, kalau tidak paginasi tidak boleh merapikan lagi
+    minPagesRef.current = Math.max(1, minPagesRef.current - 1);
     setPageNumber((prev) => Math.max(1, prev - 1));
 
     // Reset selectedPage jika perlu
@@ -188,118 +194,226 @@ export default function NewDocument() {
     pageNumberRef.current = pageNumber;
   }, [pageNumber]);
 
-  // Overflow detection: auto-add page ketika konten melebihi tinggi paper
-  const overflowCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // ===== PAGINASI OTOMATIS =====
+  // Tiga tugas: konten yang melimpah turun ke halaman berikutnya, konten yang
+  // menyusut ditarik naik lagi, dan halaman kosong di ekor dibuang.
+  //
+  // Simpul DOM dipindah apa adanya (appendChild / insertBefore), bukan lewat
+  // string innerHTML. Ini yang membuat kursor ketik tidak hilang saat paginasi,
+  // sekaligus mencegah konten halaman tujuan tertimpa.
 
-  const checkOverflow = useCallback((editorIndex: number) => {
-    const editor = document.getElementById(`main-editor-${editorIndex}`);
-    if (!editor) return;
+  const paginationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // true selama kita sendiri yang mengubah DOM, supaya MutationObserver tidak
+  // menganggapnya ketikan user lalu memicu reflow beruntun
+  const isReflowingRef = useRef(false);
+  // batas bawah jumlah halaman, dinaikkan tombol "+" supaya halaman kosong
+  // yang sengaja ditambah user tidak langsung dibuang paginasi
+  const minPagesRef = useRef(1);
 
-    // Cek apakah konten melebihi tinggi container
-    if (editor.scrollHeight > editor.clientHeight + 5) { // +5px toleransi
-      // Kumpulkan child nodes yang overflow
-      const children = Array.from(editor.childNodes);
-      if (children.length <= 1) return; // minimal harus punya >1 child
+  const getEditor = useCallback(
+    (index: number) => document.getElementById(`main-editor-${index}`),
+    []
+  );
 
-      // Temukan child node pertama yang posisinya melampaui batas bawah editor
-      const editorRect = editor.getBoundingClientRect();
-      const overflowNodes: Node[] = [];
-      let foundOverflow = false;
+  // 1px toleransi: pembulatan sub-pixel browser bisa memunculkan selisih semu
+  const isOverflowing = (editor: HTMLElement) =>
+    editor.scrollHeight > editor.clientHeight + 1;
 
-      for (let i = children.length - 1; i >= 1; i--) {
-        const child = children[i];
-        if (child instanceof HTMLElement) {
-          const childRect = child.getBoundingClientRect();
-          if (childRect.bottom > editorRect.bottom || childRect.top >= editorRect.bottom) {
-            overflowNodes.unshift(child);
-            foundOverflow = true;
-          } else {
-            break; // Sudah di area visible, stop
-          }
-        } else if (foundOverflow || (children[i - 1] instanceof HTMLElement)) {
-          // Untuk text nodes di akhir, pindahkan juga jika sudah ada overflow
-          if (foundOverflow) {
-            overflowNodes.unshift(child);
-          }
-        }
+  // Halaman dianggap kosong kalau tidak ada teks maupun elemen berwujud.
+  // <br> sisa Enter tidak dihitung isi.
+  const isEditorEmpty = (editor: HTMLElement) =>
+    !editor.textContent?.trim() && !editor.querySelector("img, table, hr");
+
+  // Kursor disimpan sebagai referensi simpul aslinya. Simpulnya memang
+  // berpindah halaman, tapi objeknya tetap sama, jadi posisi ketik user
+  // ikut pindah bersama teksnya.
+  const saveCaret = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) return null;
+
+    const range = selection.getRangeAt(0);
+    return { node: range.startContainer, offset: range.startOffset };
+  };
+
+  const restoreCaret = (saved: { node: Node; offset: number } | null) => {
+    if (!saved || !saved.node.isConnected) return;
+
+    const host = (
+      saved.node instanceof HTMLElement ? saved.node : saved.node.parentElement
+    )?.closest<HTMLElement>('[id^="main-editor-"]');
+    if (!host) return;
+
+    // batas offset berbeda: simpul teks pakai panjang teks, elemen pakai jumlah anak
+    const batas =
+      saved.node.nodeType === Node.TEXT_NODE
+        ? saved.node.textContent?.length ?? 0
+        : saved.node.childNodes.length;
+
+    try {
+      const range = document.createRange();
+      range.setStart(saved.node, Math.min(saved.offset, batas));
+      range.collapse(true);
+
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      host.focus({ preventScroll: true });
+    } catch {
+      // simpul bisa saja sudah tidak valid setelah reflow — biarkan saja
+    }
+  };
+
+  const reflowPages = useCallback(() => {
+    // jangan ganggu proses pemulihan naskah tersimpan
+    if (!isRestoredRef.current) return;
+    if (isReflowingRef.current) return;
+
+    isReflowingRef.current = true;
+
+    const caret = saveCaret();
+    const total = pageNumberRef.current;
+    let butuhHalamanBaru = false;
+
+    // --- Turunkan konten yang melimpah ke halaman berikutnya ---
+    for (let i = 0; i < total; i++) {
+      const editor = getEditor(i);
+      if (!editor || !isOverflowing(editor)) continue;
+
+      const next = getEditor(i + 1);
+      if (!next) {
+        butuhHalamanBaru = true;
+        break;
       }
 
-      if (overflowNodes.length === 0) return;
-
-      // Ekstrak HTML dari overflow nodes
-      const overflowHtml = overflowNodes.map(node => {
-        if (node instanceof HTMLElement) return node.outerHTML;
-        return node.textContent || '';
-      }).join('');
-
-      // Hapus overflow nodes dari editor saat ini
-      overflowNodes.forEach(node => {
-        if (node.parentNode === editor) {
-          editor.removeChild(node);
-        }
-      });
-
-      // Cek apakah halaman berikutnya sudah ada
-      const nextPageIndex = editorIndex + 1;
-      const nextEditor = document.getElementById(`main-editor-${nextPageIndex}`);
-
-      if (nextEditor) {
-        // Halaman berikutnya sudah ada, prepend konten
-        nextEditor.innerHTML = overflowHtml + nextEditor.innerHTML;
-        // Cek overflow cascading di halaman berikutnya
-        setTimeout(() => checkOverflow(nextPageIndex), 200);
-      } else {
-        // Buat halaman baru
-        setPageNumber(prev => prev + 1);
-        // Tunggu DOM render, lalu insert konten
-        setTimeout(() => {
-          const newEditor = document.getElementById(`main-editor-${nextPageIndex}`);
-          if (newEditor) {
-            newEditor.innerHTML = overflowHtml;
-            // Cek overflow cascading
-            setTimeout(() => checkOverflow(nextPageIndex), 200);
-          }
-        }, 300);
+      // dipindah satu simpul per putaran supaya yang turun hanya seperlunya.
+      // syarat childNodes.length > 1 mencegah putaran tak berujung ketika satu
+      // blok memang lebih tinggi daripada kertasnya
+      let jaga = 0;
+      while (isOverflowing(editor) && editor.childNodes.length > 1 && jaga++ < 500) {
+        next.insertBefore(editor.lastChild!, next.firstChild);
       }
     }
-  }, []);
 
-  // Effect: pasang event listener di setiap editor untuk deteksi overflow
+    // --- Tarik balik konten selama halaman sebelumnya masih muat ---
+    if (!butuhHalamanBaru) {
+      for (let i = 0; i < total - 1; i++) {
+        const editor = getEditor(i);
+        const next = getEditor(i + 1);
+        if (!editor || !next) continue;
+
+        let jaga = 0;
+        while (next.firstChild && jaga++ < 500) {
+          const node = next.firstChild;
+          editor.appendChild(node);
+
+          // ternyata tidak muat — kembalikan ke tempatnya lalu berhenti
+          if (isOverflowing(editor)) {
+            next.insertBefore(node, next.firstChild);
+            break;
+          }
+        }
+      }
+    }
+
+    isReflowingRef.current = false;
+    restoreCaret(caret);
+
+    // --- Tambah halaman; sisa reflow dilanjutkan setelah DOM-nya dirender ---
+    if (butuhHalamanBaru) {
+      setPageNumber((prev) => prev + 1);
+      return;
+    }
+
+    // --- Buang satu halaman kosong di ekor tiap putaran ---
+    const terakhir = getEditor(total - 1);
+    if (total > minPagesRef.current && terakhir && isEditorEmpty(terakhir)) {
+      setPageNumber((prev) => Math.max(1, prev - 1));
+      setSelectedPage((prev) => Math.min(prev, total - 2));
+    }
+  }, [getEditor]);
+
+  const scheduleReflow = useCallback(() => {
+    if (paginationTimerRef.current) clearTimeout(paginationTimerRef.current);
+    paginationTimerRef.current = setTimeout(reflowPages, 120);
+  }, [reflowPages]);
+
+  // Effect: pasang pemicu reflow di tiap editor.
+  // Observer WAJIB di-disconnect saat cleanup — versi sebelumnya hanya melepas
+  // listener, jadi observer menumpuk tiap kali jumlah halaman berubah.
   useEffect(() => {
-    const handlers: { editor: HTMLElement; handler: () => void }[] = [];
+    const editors: HTMLElement[] = [];
+    const observers: MutationObserver[] = [];
 
     for (let i = 0; i < pageNumber; i++) {
-      const editor = document.getElementById(`main-editor-${i}`);
+      const editor = getEditor(i);
       if (!editor) continue;
 
-      const handler = () => {
-        // Debounce: tunggu sebentar sebelum cek overflow
-        if (overflowCheckTimerRef.current) {
-          clearTimeout(overflowCheckTimerRef.current);
-        }
-        overflowCheckTimerRef.current = setTimeout(() => {
-          checkOverflow(i);
-        }, 300);
-      };
+      editor.addEventListener("input", scheduleReflow);
+      editors.push(editor);
 
-      editor.addEventListener('input', handler);
-
-      // MutationObserver untuk menangkap perubahan programatik (dari insertToPaper)
-      const observer = new MutationObserver(handler);
+      const observer = new MutationObserver(() => {
+        if (isReflowingRef.current) return;
+        scheduleReflow();
+      });
       observer.observe(editor, { childList: true, subtree: true, characterData: true });
-
-      handlers.push({ editor, handler });
-
-      // Juga cek overflow saat pertama kali mount (untuk konten yang sudah ada)
-      setTimeout(() => checkOverflow(i), 500);
+      observers.push(observer);
     }
 
+    // halaman baru selesai dirender → lanjutkan reflow yang tadi tertunda
+    const frame = requestAnimationFrame(reflowPages);
+
     return () => {
-      handlers.forEach(({ editor, handler }) => {
-        editor.removeEventListener('input', handler);
-      });
+      cancelAnimationFrame(frame);
+      editors.forEach((editor) => editor.removeEventListener("input", scheduleReflow));
+      observers.forEach((observer) => observer.disconnect());
     };
-  }, [pageNumber, checkOverflow]);
+  }, [pageNumber, getEditor, scheduleReflow, reflowPages]);
+
+  // Effect: Backspace di awal halaman memindahkan kursor ke ujung halaman
+  // sebelumnya. Tiap halaman adalah contentEditable terpisah, jadi tanpa ini
+  // tombol hapus terasa mati begitu kursor menyentuh batas atas kertas.
+  useEffect(() => {
+    const handleBackspaceAtStart = (event: KeyboardEvent) => {
+      if (event.key !== "Backspace") return;
+
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || !selection.isCollapsed) return;
+
+      const range = selection.getRangeAt(0);
+      const editor = (
+        range.startContainer instanceof HTMLElement
+          ? range.startContainer
+          : range.startContainer.parentElement
+      )?.closest<HTMLElement>('[id^="main-editor-"]');
+      if (!editor) return;
+
+      // benar-benar di titik paling awal halaman? diukur dari teks sebelum kursor
+      const sebelumKursor = document.createRange();
+      sebelumKursor.selectNodeContents(editor);
+      sebelumKursor.setEnd(range.startContainer, range.startOffset);
+      if (sebelumKursor.toString().length > 0) return;
+
+      const index = Number(editor.id.replace("main-editor-", ""));
+      if (!Number.isFinite(index) || index <= 0) return;
+
+      const prev = getEditor(index - 1);
+      if (!prev) return;
+
+      // cegah Backspace bawaan supaya tidak ada yang terhapus saat berpindah
+      event.preventDefault();
+
+      const ujung = document.createRange();
+      ujung.selectNodeContents(prev);
+      ujung.collapse(false);
+
+      selection.removeAllRanges();
+      selection.addRange(ujung);
+      prev.focus({ preventScroll: true });
+    };
+
+    document.addEventListener("keydown", handleBackspaceAtStart);
+    return () => document.removeEventListener("keydown", handleBackspaceAtStart);
+  }, [getEditor]);
 
   // Ref penanda: konten tersimpan sudah selesai dikembalikan ke editor
   const isRestoredRef = useRef(false);

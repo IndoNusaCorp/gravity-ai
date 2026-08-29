@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, updateProfile } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
-import { Authentication, LastDocument } from "../firebase/firebase.configuration";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { app, Authentication, LastDocument } from "../firebase/firebase.configuration";
 import {
   FileText,
   Plus,
@@ -19,6 +20,7 @@ import {
   User,
   X,
   Trash2,
+  Camera,
 } from "lucide-react";
 import { ClearAutoSave, ListAutoSaves } from "@/components/autosave";
 
@@ -106,8 +108,65 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  //foto profil dari akun yang sedang masuk, dipakai di pojok kanan atas
+  //foto profil yang sudah login posisi di pojok kanan atas
   const [photoURL, setPhotoURL] = useState<string | null>(null);
+
+  //State untuk ganti photo profile — diisi berkas yang dipilih user,
+  //supaya penjaga if di bawah baru true kalau memang ada gambar baru
+  const [changePhotoProfile, setchangePhotoProfile] = useState<File | null>(null);
+
+  //dipakai untuk membuka jendela pilih berkas dari tombol avatar
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  //storage disambungkan langsung ke firebase/storage
+  const storage = getStorage(app);
+
+  //logika untuk ganti photo profile
+  const handleChangePhotoProfile = async () => {
+    const photoprofile = photoURL;
+    const changephotoprofile = true;
+
+    //logika try-catch & if else
+      try {
+        if (changePhotoProfile) {
+          const changephotoprofile = photoURL;
+
+          //foto profil melekat pada akun, jadi harus ada yang sedang masuk
+          const user = Authentication.currentUser;
+          if (!user) {
+            console.log("Gagal ganti foto profil");
+            return;
+          }
+
+          //satu berkas per akun, jadi foto lama otomatis tertimpa
+          const berkas = ref(storage, `profilePhotos/${user.uid}`);
+          await uploadBytes(berkas, changePhotoProfile);
+
+          //URL hasil upload dipasang ke akun, lalu dipakai di avatar.
+          //changephotoprofile jadi cadangan kalau URL barunya kosong.
+          const fotoBaru = await getDownloadURL(berkas);
+          await updateProfile(user, { photoURL: fotoBaru });
+          setPhotoURL(fotoBaru || changephotoprofile);
+
+          console.log("Ganti foto profil berhasil");
+        }
+      } catch (error) {
+        //kembalikan foto lama supaya avatar tidak kosong saat upload gagal
+        setPhotoURL(photoprofile);
+        console.log("Gagal ganti foto profil", error);
+      } finally {
+        //dikosongkan supaya berkas yang sama bisa dipilih lagi nanti
+        setchangePhotoProfile(null);
+      }
+  }
+
+  //upload dijalankan begitu berkas terpilih. Lewat effect karena setState tidak
+  //langsung berlaku — memanggil handler dari onChange akan membaca
+  //changePhotoProfile yang nilainya masih lama.
+  useEffect(() => {
+    if (changePhotoProfile) handleChangePhotoProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changePhotoProfile]);
 
   useEffect(() => {
     //tiap dokumen punya kuncinya sendiri sekarang, jadi daftarnya bisa lebih dari satu
@@ -245,7 +304,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center gap-3 sm:gap-6">
           <Link href="/" className="flex items-center gap-2.5 shrink-0">
             <div className="w-8 h-8 rounded-xl bg-[#0D0606] dark:bg-[#D9E4D1] flex items-center justify-center">
-              <FileText className="w-4 h-4 text-[#D9E4D1] dark:text-[#0D0606]" />
+              <img src="/gravityai-logo-g-1b-500.png" />
             </div>
             {/* Nama produk disembunyikan di layar kecil supaya kolom cari dapat ruang */}
             <span className="hidden sm:block font-semibold tracking-tight text-[#0D0606] dark:text-[#D9E4D1]">
@@ -276,15 +335,36 @@ export default function Home() {
 
           <div className="flex items-center gap-1 shrink-0">
             <ThemeToggle />
-            {/* Avatar akun; ikon biasa dipakai kalau belum masuk */}
-            <div className="w-9 h-9 rounded-full overflow-hidden bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center">
+            {/* Avatar akun; ikon biasa dipakai kalau belum masuk.
+                Diklik untuk mengganti foto profil. */}
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              title="Ganti foto profil"
+              aria-label="Ganti foto profil"
+              className="group relative w-9 h-9 rounded-full overflow-hidden bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center"
+            >
               {photoURL ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={photoURL} alt="Foto profil" className="w-full h-full object-cover" />
               ) : (
                 <User className="w-4 h-4 text-[#0D0606]/50 dark:text-[#D9E4D1]/50" />
               )}
-            </div>
+
+              {/* penanda saat kursor di atas avatar */}
+              <span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-[#0D0606]/60">
+                <Camera className="w-3.5 h-3.5 text-white" />
+              </span>
+            </button>
+
+            {/* accept dibatasi gambar supaya user tidak memilih berkas lain */}
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(event) => setchangePhotoProfile(event.target.files?.[0] ?? null)}
+            />
           </div>
         </div>
       </header>
