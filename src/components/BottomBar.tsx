@@ -7,6 +7,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Authentication } from "../firebase/firebase.configuration";
 import { AuthModal, AuthType } from "./AuthModal";
 import { SaveSettings, RestoreSettings } from "./autosave";
+import { useParams } from "next/navigation";
 
 // Library untuk generate file DOCX & PDF yang valid
 import { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, SectionType, ShadingType, UnderlineType, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType, LineRuleType } from "docx";
@@ -19,6 +20,9 @@ interface SidebarRightProps {
 }
 
 export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRightProps) {
+    // Pengaturan kertas disimpan per-dokumen, jadi id-nya dibaca langsung dari URL
+    const { document_id } = useParams<{ document_id: string }>();
+
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [authModalType, setAuthModalType] = useState<AuthType>("login");
 
@@ -1085,21 +1089,21 @@ export function SidebarRight({ onImageUpload, selectedPageIndex = 0 }: SidebarRi
 
     // Effect: pulihkan pengaturan kertas terakhir saat halaman dibuka kembali
     useEffect(() => {
-        const saved = RestoreSettings<{ paperColor: string; paperType: string }>("paper");
+        const saved = RestoreSettings<{ paperColor: string; paperType: string }>(document_id, "paper");
         if (saved) {
             if (saved.paperColor) setPaperColor(saved.paperColor);
             if (saved.paperType) setPaperType(saved.paperType);
         }
         isPaperRestoredRef.current = true;
-    }, []);
+    }, [document_id]);
 
     // Effect: simpan pengaturan kertas setiap kali diubah
     useEffect(() => {
         // Jangan menimpa pengaturan tersimpan dengan nilai default saat mount
         if (!isPaperRestoredRef.current) return;
 
-        SaveSettings("paper", { paperColor, paperType });
-    }, [paperColor, paperType]);
+        SaveSettings(document_id, "paper", { paperColor, paperType });
+    }, [document_id, paperColor, paperType]);
 
     //fungsi upload image
     // File input ref for image upload

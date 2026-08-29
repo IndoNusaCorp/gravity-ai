@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Tailwind v4 secara bawaan membaca dark: dari setelan OS (prefers-color-scheme).
+   next-themes memakai attribute="class", jadi varian dark: harus diarahkan
+   ke class .dark di <html> supaya tombol ganti tema benar-benar berpengaruh. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,15 +17,134 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Ikut class .dark, bukan setelan OS, supaya --background & --foreground
+   berubah bersamaan dengan varian dark: di atas. Mode "system" tetap jalan
+   karena next-themes yang memasang class .dark saat OS sedang gelap. */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ===== Animasi ===== */
+
+/* Didaftarkan lewat @theme supaya Tailwind v4 membuatkan class animate-*,
+   jadi bisa dipakai langsung di JSX seperti utility lainnya.
+   Kurva [0.16, 1, 0.3, 1] disamakan dengan transisi framer-motion di editor
+   supaya gerakan CSS dan JS terasa satu gaya. */
+@theme {
+  --ease-gravity: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-fade-in: fade-in 0.4s var(--ease-gravity) both;
+  --animate-fade-in-up: fade-in-up 0.5s var(--ease-gravity) both;
+  --animate-fade-in-down: fade-in-down 0.5s var(--ease-gravity) both;
+  --animate-scale-in: scale-in 0.35s var(--ease-gravity) both;
+  --animate-slide-in-left: slide-in-left 0.45s var(--ease-gravity) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+}
+
+/* Muncul perlahan tanpa berpindah tempat */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Naik sedikit sambil memudar masuk — dipakai kartu & daftar dokumen */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Kebalikan fade-in-up, cocok untuk elemen yang menggantung di atas */
+@keyframes fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Membesar tipis dari 96% — untuk modal, popover, dan tombol */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Masuk dari kiri, cocok untuk panel samping */
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Kilau berjalan untuk kerangka pemuatan (skeleton) */
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* Denyut halus, lebih lembut dari animate-pulse bawaan Tailwind */
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Jeda bertingkat supaya elemen berurutan tidak muncul serentak.
+   Dipakai bersama animate-*, contoh: className="animate-fade-in-up stagger-2" */
+.stagger-1 { animation-delay: 60ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 180ms; }
+.stagger-4 { animation-delay: 240ms; }
+.stagger-5 { animation-delay: 300ms; }
+.stagger-6 { animation-delay: 360ms; }
+
+/* Hormati pengguna yang mematikan animasi di setelan sistemnya */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

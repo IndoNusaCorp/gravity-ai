@@ -5,6 +5,7 @@ import { Settings, Type, List, AlignLeft, AlignCenter, AlignRight, AlignJustify,
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { SaveSettings, RestoreSettings } from "@/components/autosave";
+import { useParams } from "next/navigation";
 
 //bentuk pengaturan font yang ikut disimpan ke localstorage
 type FontSettings = {
@@ -58,6 +59,9 @@ const EXTRA_FONTS_HREF = `https://fonts.googleapis.com/css2?${EXTRA_FONTS
   .join("&")}&display=swap`;
 
 export function SidebarLeft() {
+  // Pengaturan font disimpan per-dokumen, jadi id-nya dibaca langsung dari URL
+  const { document_id } = useParams<{ document_id: string }>();
+
   // Kumpulan State untuk menyimpan pengaturan gaya tulisan dan warna saat ini
   const [fontSize, setFontSize] = useState(16);
   const [fontFamily, setFontFamily] = useState("Arial");
@@ -202,7 +206,7 @@ export function SidebarLeft() {
 
   // Effect: pulihkan pengaturan font terakhir saat halaman dibuka kembali
   useEffect(() => {
-    const saved = RestoreSettings<FontSettings>("font");
+    const saved = RestoreSettings<FontSettings>(document_id, "font");
     if (!saved) {
       isSettingsRestoredRef.current = true;
       return;
@@ -215,15 +219,15 @@ export function SidebarLeft() {
     if (saved.fontColor) setFontColor(saved.fontColor);
 
     isSettingsRestoredRef.current = true;
-  }, []);
+  }, [document_id]);
 
   // Effect: simpan pengaturan font setiap kali ada yang diubah
   useEffect(() => {
     // Jangan menimpa pengaturan tersimpan dengan nilai default saat mount
     if (!isSettingsRestoredRef.current) return;
 
-    SaveSettings("font", { fontFamily, fontSize, fontWeight, textAlign, fontColor });
-  }, [fontFamily, fontSize, fontWeight, textAlign, fontColor]);
+    SaveSettings(document_id, "font", { fontFamily, fontSize, fontWeight, textAlign, fontColor });
+  }, [document_id, fontFamily, fontSize, fontWeight, textAlign, fontColor]);
 
   // Function untuk format teks advanced (dipanggil di tombol sidebar)
   const setAdvanced = (command: string) => {

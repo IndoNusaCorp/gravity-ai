@@ -1,1664 +1,503 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { SidebarLeft } from "@/components/SidebarLeft";
-import { SidebarRight } from "@/components/BottomBar";
-import { Search, Send, X, Plus, Minus, FileText, BookOpen, GraduationCap, Newspaper, Check, PenTool, Link as LinkIcon, Upload, Edit3, Calculator, AlignLeft, MessageSquare, Table, Network, MoreHorizontal } from "lucide-react";
-import { useState, useRef, useEffect, useCallback } from "react";
-import Markdown from "markdown-to-jsx";
-import { Analytics } from "@vercel/analytics/next"
-import { AutoSave, RestoreAutoSave, type UploadedImage } from "@/components/autosave";
-
-export default function Home() {
-  // State untuk melacak apakah input sedang fokus (diklik)
-  const [isFocused, setIsFocused] = useState(false);
-  // State untuk melacak apakah obrolan dengan AI sedang aktif/terbuka
-  const [isChatActive, setIsChatActive] = useState(false);
-  // State untuk menyimpan teks yang diketik pengguna di kolom pencarian/input
-  const [inputValue, setInputValue] = useState("");
-  // State untuk menyimpan riwayat obrolan (chat history)
-  const [chatHistory, setChatHistory] = useState<{ role: "user" | "friend", content: string, reasoning?: string }[]>([]);
-  // State loading AI
-  const [isLoading, setIsLoading] = useState(false);
-
-  // State untuk toast notification
-  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
-
-  // State untuk quick action modal
-  const [quickActionModal, setQuickActionModal] = useState<{ open: boolean; type: string; label: string }>({ open: false, type: "", label: "" });
-  const [quickActionTopic, setQuickActionTopic] = useState("");
-
-  // State untuk Fitur AI Tambahan (Citation, Paraphrase, Math, Advisor, Table, Outline)
-  const [featureModal, setFeatureModal] = useState<{ open: boolean; type: 'citation' | 'paraphrase' | 'math' | 'advisor' | 'table' | 'outline' | '' }>({ open: false, type: '' });
-  const [featureInput, setFeatureInput] = useState("");
-  const [isMoreFeaturesOpen, setIsMoreFeaturesOpen] = useState(false);
-
-  // State to track which message index was recently inserted to paper (for icon feedback)
-  const [insertedIndex, setInsertedIndex] = useState<number | null>(null);
-
-  // State untuk melacak jumlah halaman paper
-  const [pageNumber, setPageNumber] = useState(1);
-  // State untuk halaman yang sedang dipilih (untuk delete)
-  const [selectedPage, setSelectedPage] = useState(0);
-
-
-  //State untuk SelectText supaya bisa hanya text yang dipilih untuk di modifikasi
-  const [SelectText, setSelectText] = useState("");
-
-  //efek tombol add paper
-  const handleAddPaper = () => {
-    setPageNumber((prev) => prev + 1);
-  };
-
-  //efek tombol delete paper
-  const handleDeletePaper = () => {
-    if (pageNumber <= 1) return;
-
-    const deleteIdx = selectedPage;
-
-    // Geser konten dari halaman setelah yang dihapus ke halaman sebelumnya
-    for (let i = deleteIdx; i < pageNumber - 1; i++) {
-      const currentEditor = document.getElementById(`main-editor-${i}`);
-      const nextEditor = document.getElementById(`main-editor-${i + 1}`);
-      if (currentEditor && nextEditor) {
-        currentEditor.innerHTML = nextEditor.innerHTML;
-      }
-    }
-
-    // Hapus konten halaman terakhir (karena sudah digeser)
-    const lastEditor = document.getElementById(`main-editor-${pageNumber - 1}`);
-    if (lastEditor) {
-      lastEditor.innerHTML = '';
-    }
-
-    setPageNumber((prev) => Math.max(1, prev - 1));
-
-    // Reset selectedPage jika perlu
-    if (selectedPage >= pageNumber - 1) {
-      setSelectedPage(Math.max(0, pageNumber - 2));
-    }
-  };
-
-  // Ref untuk autoscroll chat
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [chatHistory, isLoading, isChatActive]);
-
-  // Ref untuk pageNumber (agar bisa diakses di event handler tanpa stale closure)
-  const pageNumberRef = useRef(pageNumber);
-  useEffect(() => {
-    pageNumberRef.current = pageNumber;
-  }, [pageNumber]);
-
-  // Overflow detection: auto-add page ketika konten melebihi tinggi paper
-  const overflowCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const checkOverflow = useCallback((editorIndex: number) => {
-    const editor = document.getElementById(`main-editor-${editorIndex}`);
-    if (!editor) return;
-
-    // Cek apakah konten melebihi tinggi container
-    if (editor.scrollHeight > editor.clientHeight + 5) { // +5px toleransi
-      // Kumpulkan child nodes yang overflow
-      const children = Array.from(editor.childNodes);
-      if (children.length <= 1) return; // minimal harus punya >1 child
-
-      // Temukan child node pertama yang posisinya melampaui batas bawah editor
-      const editorRect = editor.getBoundingClientRect();
-      const overflowNodes: Node[] = [];
-      let foundOverflow = false;
-
-      for (let i = children.length - 1; i >= 1; i--) {
-        const child = children[i];
-        if (child instanceof HTMLElement) {
-          const childRect = child.getBoundingClientRect();
-          if (childRect.bottom > editorRect.bottom || childRect.top >= editorRect.bottom) {
-            overflowNodes.unshift(child);
-            foundOverflow = true;
-          } else {
-            break; // Sudah di area visible, stop
-          }
-        } else if (foundOverflow || (children[i - 1] instanceof HTMLElement)) {
-          // Untuk text nodes di akhir, pindahkan juga jika sudah ada overflow
-          if (foundOverflow) {
-            overflowNodes.unshift(child);
-          }
-        }
-      }
-
-      if (overflowNodes.length === 0) return;
-
-      // Ekstrak HTML dari overflow nodes
-      const overflowHtml = overflowNodes.map(node => {
-        if (node instanceof HTMLElement) return node.outerHTML;
-        return node.textContent || '';
-      }).join('');
-
-      // Hapus overflow nodes dari editor saat ini
-      overflowNodes.forEach(node => {
-        if (node.parentNode === editor) {
-          editor.removeChild(node);
-        }
-      });
-
-      // Cek apakah halaman berikutnya sudah ada
-      const nextPageIndex = editorIndex + 1;
-      const nextEditor = document.getElementById(`main-editor-${nextPageIndex}`);
-
-      if (nextEditor) {
-        // Halaman berikutnya sudah ada, prepend konten
-        nextEditor.innerHTML = overflowHtml + nextEditor.innerHTML;
-        // Cek overflow cascading di halaman berikutnya
-        setTimeout(() => checkOverflow(nextPageIndex), 200);
-      } else {
-        // Buat halaman baru
-        setPageNumber(prev => prev + 1);
-        // Tunggu DOM render, lalu insert konten
-        setTimeout(() => {
-          const newEditor = document.getElementById(`main-editor-${nextPageIndex}`);
-          if (newEditor) {
-            newEditor.innerHTML = overflowHtml;
-            // Cek overflow cascading
-            setTimeout(() => checkOverflow(nextPageIndex), 200);
-          }
-        }, 300);
-      }
-    }
-  }, []);
-
-  // Effect: pasang event listener di setiap editor untuk deteksi overflow
-  useEffect(() => {
-    const handlers: { editor: HTMLElement; handler: () => void }[] = [];
-
-    for (let i = 0; i < pageNumber; i++) {
-      const editor = document.getElementById(`main-editor-${i}`);
-      if (!editor) continue;
-
-      const handler = () => {
-        // Debounce: tunggu sebentar sebelum cek overflow
-        if (overflowCheckTimerRef.current) {
-          clearTimeout(overflowCheckTimerRef.current);
-        }
-        overflowCheckTimerRef.current = setTimeout(() => {
-          checkOverflow(i);
-        }, 300);
-      };
-
-      editor.addEventListener('input', handler);
-
-      // MutationObserver untuk menangkap perubahan programatik (dari insertToPaper)
-      const observer = new MutationObserver(handler);
-      observer.observe(editor, { childList: true, subtree: true, characterData: true });
-
-      handlers.push({ editor, handler });
-
-      // Juga cek overflow saat pertama kali mount (untuk konten yang sudah ada)
-      setTimeout(() => checkOverflow(i), 500);
-    }
-
-    return () => {
-      handlers.forEach(({ editor, handler }) => {
-        editor.removeEventListener('input', handler);
-      });
-    };
-  }, [pageNumber, checkOverflow]);
-
-  // Ref penanda: konten tersimpan sudah selesai dikembalikan ke editor
-  const isRestoredRef = useRef(false);
-  // Ref penampung konten hasil restore yang menunggu halaman selesai dirender
-  const pendingRestoreRef = useRef<string[] | null>(null);
-  // Ref untuk timer autosave (dipakai debounce: timer lama dibatalkan saat user masih mengetik)
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Ref berisi gambar upload terbaru, supaya autosave tidak membaca nilai basi
-  const uploadedImagesRef = useRef<UploadedImage[]>([]);
-
-  // Jadwalkan autosave dengan debounce. Dipakai oleh perubahan naskah maupun gambar.
-  const scheduleAutoSave = useCallback(() => {
-    // Jangan menimpa naskah tersimpan sebelum proses restore selesai
-    if (!isRestoredRef.current) return;
-
-    // Debounce: batalkan jadwal sebelumnya supaya simpan hanya saat user berhenti
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = AutoSave(pageNumberRef.current, uploadedImagesRef.current);
-  }, []);
-
-  // Effect: baca naskah tersimpan dari localStorage saat halaman pertama kali dibuka
-  useEffect(() => {
-    const savedDocument = RestoreAutoSave();
-
-    // Tidak ada naskah tersimpan, langsung izinkan autosave berjalan
-    if (!savedDocument || savedDocument.halaman.length === 0) {
-      isRestoredRef.current = true;
-      return;
-    }
-
-    // Gambar upload hidup di React state, bukan di innerHTML editor,
-    // jadi harus dipulihkan terpisah dari naskah.
-    setUploadedImages(savedDocument.images);
-    uploadedImagesRef.current = savedDocument.images;
-
-    // Simpan konten dulu, lalu siapkan jumlah halaman sesuai naskah terakhir
-    pendingRestoreRef.current = savedDocument.halaman;
-    setPageNumber(Math.max(1, savedDocument.pageNumber));
-  }, []);
-
-  // Effect: isi ulang editor setelah halaman hasil restore selesai dirender
-  useEffect(() => {
-    const savedPages = pendingRestoreRef.current;
-    if (!savedPages) return;
-    if (pageNumber < savedPages.length) return; // tunggu sampai semua halaman tersedia
-
-    const frame = requestAnimationFrame(() => {
-      savedPages.forEach((content, index) => {
-        const editor = document.getElementById(`main-editor-${index}`);
-        if (editor) editor.innerHTML = content;
-      });
-
-      pendingRestoreRef.current = null;
-      isRestoredRef.current = true;
-      setToast({ message: "The saved file was successfully restored", visible: true });
-      setTimeout(() => setToast({ message: "", visible: false }), 3000);
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [pageNumber]);
-
-  // Effect: pasang pemicu autosave di setiap editor (ketikan user maupun sisipan dari AI)
-  useEffect(() => {
-    const listeners: { editor: HTMLElement; handler: () => void }[] = [];
-    const observers: MutationObserver[] = [];
-
-    for (let i = 0; i < pageNumber; i++) {
-      const editor = document.getElementById(`main-editor-${i}`);
-      if (!editor) continue;
-
-      editor.addEventListener('input', scheduleAutoSave);
-      listeners.push({ editor, handler: scheduleAutoSave });
-
-      const observer = new MutationObserver(scheduleAutoSave);
-      observer.observe(editor, { childList: true, subtree: true, characterData: true });
-      observers.push(observer);
-    }
-
-    return () => {
-      listeners.forEach(({ editor, handler }) => editor.removeEventListener('input', handler));
-      observers.forEach((observer) => observer.disconnect());
-    };
-  }, [pageNumber, scheduleAutoSave]);
-
-  // State untuk menyimpan gambar yang diupload ke atas kertas
-  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
-  // Gambar yang sedang dipilih, supaya bisa dihapus dengan tombol Delete
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-
-  // Effect: gambar hidup di React state, jadi perubahannya (tambah, geser, hapus)
-  // harus ikut memicu autosave sendiri karena tidak menyentuh DOM editor.
-  useEffect(() => {
-    uploadedImagesRef.current = uploadedImages;
-    scheduleAutoSave();
-  }, [uploadedImages, scheduleAutoSave]);
-
-  // Effect: tombol Delete menghapus gambar yang sedang dipilih.
-  // Sengaja tidak memakai Backspace supaya tidak bentrok saat user mengetik.
-  useEffect(() => {
-    if (!selectedImageId) return;
-
-    const handleDeleteKey = (event: KeyboardEvent) => {
-      if (event.key !== "Delete") return;
-
-      // Jangan hapus gambar kalau kursor sedang berada di dalam naskah
-      const active = document.activeElement;
-      if (active instanceof HTMLElement && active.isContentEditable) return;
-
-      setUploadedImages((prev) => prev.filter((image) => image.id !== selectedImageId));
-      setSelectedImageId(null);
-    };
-
-    document.addEventListener("keydown", handleDeleteKey);
-    return () => document.removeEventListener("keydown", handleDeleteKey);
-  }, [selectedImageId]);
-
-  // Fungsi yang dipanggil saat ada gambar yang diupload dari SidebarRight
-  const handleImageUpload = (src: string) => {
-    setUploadedImages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        src: src,
-        x: 100, // Mulai dari posisi X: 100
-        y: 100, // Mulai dari posisi Y: 100
-      },
-    ]);
-  };
-
-  // Helper: Render cover page block menjadi HTML halaman sampul akademis
-  const renderCoverPageHtml = useCallback((coverBlock: string): string => {
-    const fields: Record<string, string> = {};
-    const lines = coverBlock.split('\n');
-    for (const line of lines) {
-      const match = line.trim().match(/^(TITLE|DOCTYPE|DESCRIPTION|AUTHOR|NIM|DEPARTMENT|FACULTY|UNIVERSITY|YEAR):\s*(.+)$/i);
-      if (match) {
-        fields[match[1].toUpperCase()] = match[2].trim();
-      }
-    }
-
-    const title = fields['TITLE'] || '[Judul Dokumen]';
-    const docType = fields['DOCTYPE'] || '';
-    const description = fields['DESCRIPTION'] || '';
-    const author = fields['AUTHOR'] || '[Nama Penulis]';
-    const nim = fields['NIM'] || '[NIM]';
-    const department = fields['DEPARTMENT'] || '[Program Studi]';
-    const faculty = fields['FACULTY'] || '[Fakultas]';
-    const university = fields['UNIVERSITY'] || '[Nama Universitas]';
-    const year = fields['YEAR'] || '[Tahun]';
-
-    return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:space-between;min-height:85vh;text-align:center;padding:2em 2em;">
-      <div style="display:flex;flex-direction:column;align-items:center;gap:0.5em;margin-top:2em;">
-        <h1 style="font-size:1.4em;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;line-height:1.5;color:#18181b;margin:0;padding:0;border:none;max-width:85%;">${title}</h1>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:1.2em;">
-        ${docType ? `<h2 style="font-size:1.25em;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#18181b;margin:0;">${docType}</h2>` : ''}
-        ${description ? `<p style="font-size:0.95em;font-style:italic;color:#3f3f46;line-height:1.6;max-width:80%;margin:0;">${description}</p>` : ''}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:0.3em;">
-        <p style="font-size:1.05em;font-weight:700;color:#18181b;margin:0;">${author}</p>
-        <p style="font-size:1em;font-weight:400;color:#3f3f46;margin:0;">${nim}</p>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:0.3em;margin-bottom:2em;">
-        <p style="font-size:1em;font-weight:700;text-transform:uppercase;color:#18181b;margin:0;">${department}</p>
-        <p style="font-size:1em;font-weight:700;text-transform:uppercase;color:#18181b;margin:0;">${faculty}</p>
-        <p style="font-size:1em;font-weight:700;text-transform:uppercase;color:#18181b;margin:0;">${university}</p>
-        <p style="font-size:1em;font-weight:700;color:#18181b;margin:0;">${year}</p>
-      </div>
-    </div>`;
-  }, []);
-
-  // Helper: Konversi Markdown ke HTML terstruktur dan rapi untuk paper akademis
-  const convertMarkdownToHtml = useCallback((md: string): string => {
-    // Deteksi cover page block
-    const coverStartIdx = md.indexOf('---COVER_PAGE_START---');
-    const coverEndIdx = md.indexOf('---COVER_PAGE_END---');
-
-    if (coverStartIdx !== -1 && coverEndIdx !== -1 && coverEndIdx > coverStartIdx) {
-      const coverBlock = md.substring(coverStartIdx + '---COVER_PAGE_START---'.length, coverEndIdx);
-      const coverHtml = renderCoverPageHtml(coverBlock);
-      // Hanya return cover page HTML (sisa konten dihandle oleh splitMarkdownIntoSections)
-      const beforeCover = md.substring(0, coverStartIdx).trim();
-      const afterCover = md.substring(coverEndIdx + '---COVER_PAGE_END---'.length).trim();
-
-      // Jika ada konten setelah cover page, proses secara terpisah
-      if (afterCover) {
-        // Ini seharusnya tidak terjadi karena splitMarkdownIntoSections sudah memisahkan
-        // Tapi sebagai fallback, gabungkan
-        return coverHtml;
-      }
-      return coverHtml;
-    }
-
-    const lines = md.split('\n');
-    const htmlParts: string[] = [];
-    let inUl = false;
-    let inOl = false;
-    let paragraphBuffer: string[] = [];
-
-    // Helper: konversi inline formatting (bold, italic, code)
-    const inlineFormat = (text: string): string => {
-      return text
-        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/`(.+?)`/g, '<code style="background:#f0f0f3;padding:2px 7px;border-radius:4px;font-size:0.88em;font-family:\'SF Mono\',\'Fira Code\',\'Cascadia Code\',monospace;color:#18181b;">$1</code>');
-    };
-
-    // Helper: flush paragraph buffer
-    const flushParagraph = () => {
-      if (paragraphBuffer.length > 0) {
-        const text = paragraphBuffer.join('<br/>');
-        htmlParts.push(`<p style="margin:0.6em 0 0.8em;line-height:2;text-align:justify;text-indent:2em;color:#1a1a1a;">${inlineFormat(text)}</p>`);
-        paragraphBuffer = [];
-      }
-    };
-
-    // Helper: tutup list yang sedang terbuka
-    const closeList = () => {
-      if (inUl) { htmlParts.push('</ul>'); inUl = false; }
-      if (inOl) { htmlParts.push('</ol>'); inOl = false; }
-    };
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-
-      // Skip cover page markers jika masih ada
-      if (trimmed === '---COVER_PAGE_START---' || trimmed === '---COVER_PAGE_END---') {
-        continue;
-      }
-
-      // Baris kosong → flush paragraph & tutup list
-      if (!trimmed) {
-        flushParagraph();
-        closeList();
-        continue;
-      }
-
-      // Heading 1: # Title — Judul utama dokumen
-      const h1Match = trimmed.match(/^#\s+(.+)$/);
-      if (h1Match && !trimmed.startsWith('##')) {
-        flushParagraph();
-        closeList();
-        htmlParts.push(`<h1 style="font-size:1.5em;font-weight:700;margin:1.6em 0 0.6em;padding-bottom:0.4em;border-bottom:2.5px solid #18181b;color:#18181b;letter-spacing:0.01em;text-transform:uppercase;">${inlineFormat(h1Match[1])}</h1>`);
-        continue;
-      }
-
-      // Heading 2: ## BAB / Section — dengan garis atas halus sebagai pemisah
-      const h2Match = trimmed.match(/^##\s+(.+)$/);
-      if (h2Match && !trimmed.startsWith('###')) {
-        flushParagraph();
-        closeList();
-        htmlParts.push(`<h2 style="font-size:1.25em;font-weight:700;margin:1.8em 0 0.5em;padding-top:0.8em;border-top:1px solid #d4d4d8;color:#18181b;letter-spacing:0.01em;">${inlineFormat(h2Match[1])}</h2>`);
-        continue;
-      }
-
-      // Heading 3: ### Sub-bab
-      const h3Match = trimmed.match(/^###\s+(.+)$/);
-      if (h3Match) {
-        flushParagraph();
-        closeList();
-        htmlParts.push(`<h3 style="font-size:1.1em;font-weight:600;margin:1.2em 0 0.4em;color:#27272a;padding-left:0.2em;">${inlineFormat(h3Match[1])}</h3>`);
-        continue;
-      }
-
-      // Heading 4: #### Sub-sub-bab
-      const h4Match = trimmed.match(/^####\s+(.+)$/);
-      if (h4Match) {
-        flushParagraph();
-        closeList();
-        htmlParts.push(`<h4 style="font-size:1.02em;font-weight:600;margin:1em 0 0.3em;color:#3f3f46;padding-left:0.4em;">${inlineFormat(h4Match[1])}</h4>`);
-        continue;
-      }
-
-      // Horizontal rule: --- atau *** (tapi BUKAN cover page markers)
-      if (/^[-*_]{3,}$/.test(trimmed) && !trimmed.includes('COVER_PAGE')) {
-        flushParagraph();
-        closeList();
-        htmlParts.push('<hr style="border:none;border-top:1px solid #e4e4e7;margin:2em 1em;"/>');
-        continue;
-      }
-
-      // Blockquote: > text
-      const bqMatch = trimmed.match(/^>\s*(.*)$/);
-      if (bqMatch) {
-        flushParagraph();
-        closeList();
-        htmlParts.push(`<blockquote style="border-left:3.5px solid #3b82f6;padding:0.6em 1.2em;margin:1em 0;background:#f8fafc;border-radius:0 6px 6px 0;color:#374151;font-style:italic;line-height:1.8;">${inlineFormat(bqMatch[1])}</blockquote>`);
-        continue;
-      }
-
-      // Unordered list: - item atau * item
-      const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
-      if (ulMatch) {
-        flushParagraph();
-        if (inOl) { htmlParts.push('</ol>'); inOl = false; }
-        if (!inUl) {
-          htmlParts.push('<ul style="margin:0.6em 0;padding-left:2em;list-style-type:disc;">');
-          inUl = true;
-        }
-        htmlParts.push(`<li style="margin:0.35em 0;line-height:1.9;color:#1a1a1a;">${inlineFormat(ulMatch[1])}</li>`);
-        continue;
-      }
-
-      // Ordered list: 1. item
-      const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
-      if (olMatch) {
-        flushParagraph();
-        if (inUl) { htmlParts.push('</ul>'); inUl = false; }
-        if (!inOl) {
-          htmlParts.push('<ol style="margin:0.6em 0;padding-left:2em;list-style-type:decimal;">');
-          inOl = true;
-        }
-        htmlParts.push(`<li style="margin:0.35em 0;line-height:1.9;color:#1a1a1a;">${inlineFormat(olMatch[1])}</li>`);
-        continue;
-      }
-
-      // Regular text → tambahkan ke paragraph buffer
-      closeList();
-      paragraphBuffer.push(trimmed);
-    }
-
-    // Flush sisa-sisa
-    flushParagraph();
-    closeList();
-
-    return htmlParts.join('\n');
-  }, [renderCoverPageHtml]);
-
-  // Helper: Memecah markdown menjadi beberapa section berdasarkan heading utama
-  const splitMarkdownIntoSections = useCallback((md: string): string[] => {
-    const sections: string[] = [];
-    let remainingMd = md;
-
-    // 1. Deteksi cover page block terlebih dahulu → jadikan section pertama
-    const coverStartIdx = md.indexOf('---COVER_PAGE_START---');
-    const coverEndIdx = md.indexOf('---COVER_PAGE_END---');
-
-    if (coverStartIdx !== -1 && coverEndIdx !== -1 && coverEndIdx > coverStartIdx) {
-      // Cover page menjadi section pertama (satu halaman penuh)
-      const coverSection = md.substring(coverStartIdx, coverEndIdx + '---COVER_PAGE_END---'.length);
-      sections.push(coverSection.trim());
-
-      // Sisa konten setelah cover page
-      remainingMd = md.substring(coverEndIdx + '---COVER_PAGE_END---'.length).trim();
-    }
-
-    // 2. Split sisa konten berdasarkan heading level 1 atau 2 (# atau ##)
-    if (remainingMd) {
-      const lines = remainingMd.split('\n');
-      let currentSection = '';
-
-      for (const line of lines) {
-        // Deteksi heading utama (# atau ##, tapi BUKAN ###)
-        if (/^#{1,2}\s+/.test(line) && !/^###/.test(line)) {
-          // Jika sudah ada konten, simpan section sebelumnya
-          if (currentSection.trim()) {
-            sections.push(currentSection.trim());
-          }
-          currentSection = line + '\n';
-        } else {
-          currentSection += line + '\n';
-        }
-      }
-      // Jangan lupa section terakhir
-      if (currentSection.trim()) {
-        sections.push(currentSection.trim());
-      }
-    }
-
-    // Jika hanya ada 1 section (tanpa cover) atau kosong, coba split berdasarkan jumlah baris
-    const nonCoverSections = sections.filter(s => !s.includes('---COVER_PAGE_START---'));
-    if (nonCoverSections.length <= 1 && remainingMd.length > 1500) {
-      // Remove non-cover sections dan re-split
-      const coverSections = sections.filter(s => s.includes('---COVER_PAGE_START---'));
-      const allLines = remainingMd.split('\n');
-      const linesPerPage = 40;
-      const chunkedSections: string[] = [];
-      for (let i = 0; i < allLines.length; i += linesPerPage) {
-        chunkedSections.push(allLines.slice(i, i + linesPerPage).join('\n'));
-      }
-      return [...coverSections, ...chunkedSections];
-    }
-
-    return sections;
-  }, []);
-
-  // Fungsi untuk menyisipkan konten AI ke paper editor dengan AUTO-PAGINATION
-  const insertToPaper = useCallback((markdownContent: string, messageIndex?: number) => {
-    const sections = splitMarkdownIntoSections(markdownContent);
-
-    if (sections.length <= 1) {
-      // Konten pendek — masukkan ke halaman terakhir saja
-      const targetPage = pageNumber - 1;
-      const editor = document.getElementById(`main-editor-${targetPage}`);
-      if (!editor) return;
-
-      const htmlContent = convertMarkdownToHtml(markdownContent);
-      const separator = editor.innerHTML.trim() ? '<hr style="border:none;border-top:1px solid #e4e4e7;margin:2em 0;"/>' : '';
-      editor.innerHTML += separator + htmlContent;
-    } else {
-      // Konten panjang — distribusikan ke beberapa halaman
-      // Halaman pertama: masukkan section pertama ke halaman terakhir yang ada
-      const firstEditor = document.getElementById(`main-editor-${pageNumber - 1}`);
-      if (firstEditor) {
-        const separator = firstEditor.innerHTML.trim() ? '<hr style="border:none;border-top:1px solid #e4e4e7;margin:2em 0;"/>' : '';
-        firstEditor.innerHTML += separator + convertMarkdownToHtml(sections[0]);
-      }
-
-      // Tambah halaman baru untuk section-section berikutnya
-      const newPagesNeeded = sections.length - 1;
-      const startPageIndex = pageNumber; // halaman baru dimulai dari index ini
-
-      // Update jumlah halaman
-      setPageNumber(prev => prev + newPagesNeeded);
-
-      // Gunakan setTimeout bertingkat untuk menunggu DOM render halaman baru
-      const insertRemainingSection = (sectionIdx: number) => {
-        if (sectionIdx >= sections.length) return;
-
-        const editorId = `main-editor-${startPageIndex + (sectionIdx - 1)}`;
-        const editor = document.getElementById(editorId);
-
-        if (editor) {
-          editor.innerHTML = convertMarkdownToHtml(sections[sectionIdx]);
-          // Insert section berikutnya
-          if (sectionIdx + 1 < sections.length) {
-            setTimeout(() => insertRemainingSection(sectionIdx + 1), 150);
-          }
-        } else {
-          // DOM belum siap, coba lagi
-          setTimeout(() => insertRemainingSection(sectionIdx), 200);
-        }
-      };
-
-      // Mulai insert dari section ke-2 (index 1) setelah delay untuk render
-      setTimeout(() => insertRemainingSection(1), 300);
-    }
-
-    // Show success toast
-    const totalPages = sections.length > 1 ? sections.length : 1;
-    setToast({
-      message: totalPages > 1
-        ? `✅ Berhasil ditulis ke ${totalPages} halaman Paper!`
-        : '✅ Berhasil ditulis ke Paper!',
-      visible: true
-    });
-    setTimeout(() => setToast({ message: "", visible: false }), 3000);
-
-    // Show checkmark feedback on the button
-    if (messageIndex !== undefined) {
-      setInsertedIndex(messageIndex);
-      setTimeout(() => setInsertedIndex(null), 2500);
-    }
-
-    // Scroll to the first page where content was inserted
-    const firstPage = document.getElementById(`main-editor-${pageNumber - 1}`);
-    if (firstPage) {
-      firstPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [pageNumber, convertMarkdownToHtml, splitMarkdownIntoSections]);
-
-  // Disini mencoba untuk koneksikan sistem ke backend
-  const sendToAI = async (messageText: string) => {
-      if (!messageText.trim() || isLoading) return;
-
-      const newUserMessage = { role: "user" as const, content: messageText };
-      setChatHistory(prev => [...prev, newUserMessage]);
-      setIsChatActive(true);
-      setIsLoading(true);
-      setInputValue("");
-
-      try {
-         //Menunggu respon dari backend (Streaming)
-         const connectfrombackend = await fetch("/api/LibraAI", {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({message: messageText}),
-         });
-
-         if (!connectfrombackend.body) throw new Error("No response body");
-
-         const reader = connectfrombackend.body.getReader();
-         const decoder = new TextDecoder();
-         let done = false;
-
-         let currentReasoning = "";
-         let currentContent = "";
-
-         // Inisialisasi bubble AI kosong
-         setChatHistory(prev => [...prev, { role: "friend", content: "", reasoning: "" }]);
-
-         while (!done) {
-             const { value, done: readerDone } = await reader.read();
-             done = readerDone;
-             if (value) {
-                 const chunkStr = decoder.decode(value, { stream: true });
-                 const lines = chunkStr.split('\n');
-                 for (const line of lines) {
-                     if (line.startsWith('data: ')) {
-                         try {
-                             const data = JSON.parse(line.slice(6));
-                             if (data.type === 'reasoning') {
-                                 currentReasoning += data.content;
-                             } else if (data.type === 'content') {
-                                 currentContent += data.content;
-                             }
-                             
-                             setChatHistory(prev => {
-                                 const newHistory = [...prev];
-                                 newHistory[newHistory.length - 1] = { 
-                                     ...newHistory[newHistory.length - 1], 
-                                     content: currentContent,
-                                     reasoning: currentReasoning
-                                 };
-                                 return newHistory;
-                             });
-                         } catch (e) {}
-                     }
-                 }
-             }
-         }
-      } catch {
-         //Pesan untuk kalau AI masih belum terkoneksi dari backend ke front end
-         console.log("LibraAI belum terkoneksi");
-         setChatHistory(prev => [...prev, { role: "friend", content: "Maaf, saya sedang kesulitan terhubung dengan LibraAI saat ini." }]);
-      } finally {
-         setIsLoading(false);
-      }
-  };
-
-  // Fungsi khusus untuk Quick Action: kirim ke AI dengan tipe paper, lalu insert ke paper
-  const sendToAIForPaper = async (topic: string, docType: string) => {
-    if (!topic.trim() || isLoading) return;
-
-    const typeLabel = docType === 'paper_research' ? 'Research' : docType === 'paper_skripsi' ? 'Skripsi' : 'Artikel Ilmiah';
-    const newUserMessage = { role: "user" as const, content: `📄 Buatkan ${typeLabel}: ${topic}` };
-    setChatHistory(prev => [...prev, newUserMessage]);
-
-    setIsChatActive(true);
-    setIsLoading(true);
-    setQuickActionModal({ open: false, type: "", label: "" });
-    setQuickActionTopic("");
-
-    try {
-      const recentHistory = chatHistory.slice(-6).map(msg => ({
-        role: msg.role === "user" ? "user" : "system",
-        content: msg.content
-      }));
-
-      const response = await fetch("/api/LibraAI", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: topic, type: docType, history: recentHistory }),
-      });
-
-      if (!response.ok || !response.body) throw new Error("Failed to fetch from API");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-
-      let currentReasoning = "";
-      let currentContent = "";
-
-      setChatHistory(prev => [...prev, { role: "friend", content: "", reasoning: "" }]);
-
-      while (!done) {
-          const { value, done: readerDone } = await reader.read();
-          done = readerDone;
-          if (value) {
-              const chunkStr = decoder.decode(value, { stream: true });
-              const lines = chunkStr.split('\n');
-              for (const line of lines) {
-                  if (line.startsWith('data: ')) {
-                      try {
-                          const data = JSON.parse(line.slice(6));
-                          if (data.type === 'reasoning') {
-                              currentReasoning += data.content;
-                          } else if (data.type === 'content') {
-                              currentContent += data.content;
-                          }
-                          
-                          setChatHistory(prev => {
-                              const newHistory = [...prev];
-                              newHistory[newHistory.length - 1] = { 
-                                  ...newHistory[newHistory.length - 1], 
-                                  content: currentContent,
-                                  reasoning: currentReasoning
-                              };
-                              return newHistory;
-                          });
-                      } catch (e) {}
-                  }
-              }
-          }
-      }
-
-      let reply = currentContent || "Pesan berhasil diterima.";
-
-      // Bersihkan teks pembuka/basa-basi sebelum heading markdown pertama
-      // Contoh: "Tentu, ini draf artikel... \n\n# Judul" → "# Judul"
-      let cleanedReply = reply;
-      const headingIndex = reply.search(/^#\s+/m);
-      if (headingIndex > 0) {
-        cleanedReply = reply.substring(headingIndex);
-      }
-
-      // Auto-insert ke paper setelah response diterima
-      // Kita perlu delay sedikit agar state terupdate dulu
-      setTimeout(() => {
-        insertToPaper(cleanedReply);
-      }, 100);
-
-    } catch (error) {
-      console.error("Error fetching from API:", error);
-      setChatHistory(prev => [...prev, { role: "friend", content: "Maaf, saya sedang kesulitan terhubung dengan LibraAI saat ini." }]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // --- FITUR 1: Auto-Citation ---
-  const handleAutoCitation = () => {
-    if (!featureInput.trim()) return;
-    const topic = `Buatkan daftar pustaka format APA atau IEEE secara akurat berdasarkan referensi (Judul/DOI/Link) berikut:\n${featureInput}`;
-    setFeatureModal({ open: false, type: '' });
-    setFeatureInput('');
-    sendToAI(topic);
-  };
-
-  // --- FITUR 2: Chat with Papers (Upload PDF / Jurnal) ---
-  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setToast({ message: `✅ Membaca dokumen ${file.name}...`, visible: true });
-      setTimeout(() => setToast({ message: "", visible: false }), 3000);
-
-      const topic = `[SISTEM: Pengguna mengunggah referensi "${file.name}"]\nTolong bantu saya menganalisis, mencari research gap, atau merangkum dokumen yang saya unggah ini. Apakah kamu siap?`;
-      sendToAI(topic);
-      // Reset input supaya bisa upload file yang sama lagi
-      e.target.value = '';
-    }
-  };
-
-  // --- FITUR 3: Academic Paraphraser ---
-  const handleParaphrase = () => {
-    if (!featureInput.trim()) return;
-    const topic = `Tolong tulis ulang teks berikut agar menggunakan gaya bahasa akademis, baku, ilmiah, dan objektif:\n\n"${featureInput}"`;
-    setFeatureModal({ open: false, type: '' });
-    setFeatureInput('');
-    sendToAI(topic);
-  };
-
-  // --- FITUR 4: Integrasi Math Equation ---
-  const handleMathEquation = () => {
-    if (!featureInput.trim()) return;
-    const topic = `Buatkan rumus matematika menggunakan format LaTeX / text untuk deskripsi berikut:\n\n"${featureInput}"\n\nTampilkan hasilnya di dalam blok kode (code block) agar format stabil dan mudah disalin.`;
-    setFeatureModal({ open: false, type: '' });
-    setFeatureInput('');
-    sendToAI(topic);
-  };
-
-  // --- FITUR 6: Virtual Advisor ---
-  const handleVirtualAdvisor = () => {
-    if (!featureInput.trim()) return;
-    const topic = `Bertindaklah sebagai dosen pembimbing skripsi/penelitian yang kritis. Berikan evaluasi, kritik, dan saran perbaikan yang membangun untuk draf teks berikut:\n\n"${featureInput}"`;
-    setFeatureModal({ open: false, type: '' });
-    setFeatureInput('');
-    sendToAI(topic);
-  };
-
-  // --- FITUR 7: Data & Table Formatter ---
-  const handleTableFormatter = () => {
-    if (!featureInput.trim()) return;
-    const topic = `Tolong ubah data mentah berikut menjadi sebuah format tabel (Markdown Table) yang rapi, terstruktur, dan mudah dibaca:\n\n"${featureInput}"`;
-    setFeatureModal({ open: false, type: '' });
-    setFeatureInput('');
-    sendToAI(topic);
-  };
-
-  // --- FITUR 8: Smart Outline Builder ---
-  const handleOutlineBuilder = () => {
-    if (!featureInput.trim()) return;
-    const topic = `Buatkan struktur outline (kerangka tulisan/mind map) yang sistematis untuk topik penelitian berikut:\n\n"${featureInput}"\n\nTolong sertakan poin-poin penting yang wajib dibahas pada setiap bab dan sub-babnya.`;
-    setFeatureModal({ open: false, type: '' });
-    setFeatureInput('');
-    sendToAI(topic);
-  };
-
-  // --- FITUR 5: Auto-Generate Abstract ---
-  const handleAutoAbstract = () => {
-    let fullText = "";
-    for (let i = 0; i < pageNumber; i++) {
-      const editor = document.getElementById(`main-editor-${i}`);
-      if (editor) {
-        fullText += editor.innerText + "\\n\\n";
-      }
-    }
-
-    if (fullText.trim().length < 50) {
-      setToast({ message: "⚠️ Teks di paper terlalu pendek untuk dibuatkan abstrak.", visible: true });
-      setTimeout(() => setToast({ message: "", visible: false }), 3000);
-      return;
-    }
-
-    const topic = `Buatkan abstrak (sekitar 200-250 kata) berbahasa Indonesia berdasarkan keseluruhan isi naskah paper saya berikut ini:\n\n${fullText.substring(0, 3000)}...`;
-    sendToAI(topic);
-  };
-
-  const handleSend = () => sendToAI(inputValue);
-
-  const handleStart = () => {
-    if (inputValue.trim()) {
-      handleSend();
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const handleSuggestion = (suggestion: string) => {
-    sendToAI(suggestion);
-  };
-
-  // State untuk toolbar posisi (muncul di dekat teks yang diseleksi)
-  const [selectionToolbar, setSelectionToolbar] = useState<{ visible: boolean; x: number; y: number }>({ visible: false, x: 0, y: 0 });
-  const [customFontSize, setCustomFontSize] = useState("16");
-  const selectionToolbarRef = useRef<HTMLDivElement>(null);
-  const savedSelectionRangeRef = useRef<Range | null>(null);
-  const isUsingSelectionToolbarRef = useRef(false);
-
-  // Logika untuk mendeteksi teks yang dipilih di editor
-  useEffect(() => {
-    const handleSelectionChange = () => {
-      const selection = window.getSelection();
-
-      // Klik pada toolbar memindahkan fokus dari editor. Jangan tutup toolbar
-      // selama tombol, select, atau color picker sedang digunakan.
-      if (
-        isUsingSelectionToolbarRef.current ||
-        selectionToolbarRef.current?.contains(document.activeElement)
-      ) {
-        return;
-      }
-
-      if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-        savedSelectionRangeRef.current = null;
-        setSelectText("");
-        setSelectionToolbar({ visible: false, x: 0, y: 0 });
-        return;
-      }
-
-      // Pastikan seleksi ada di dalam salah satu editor
-      const anchorNode = selection.anchorNode;
-      if (!anchorNode) return;
-
-      const editorParent = (anchorNode instanceof HTMLElement ? anchorNode : anchorNode.parentElement)?.closest('[id^="main-editor-"]');
-      if (!editorParent) {
-        savedSelectionRangeRef.current = null;
-        setSelectText("");
-        setSelectionToolbar({ visible: false, x: 0, y: 0 });
-        return;
-      }
-
-      const selectedText = selection.toString();
-      setSelectText(selectedText);
-
-      // Posisi toolbar di atas teks yang diseleksi
-      const range = selection.getRangeAt(0);
-      savedSelectionRangeRef.current = range.cloneRange();
-      const rect = range.getBoundingClientRect();
-      setSelectionToolbar({
-        visible: true,
-        x: rect.left + rect.width / 2,
-        y: rect.top - 10,
-      });
-    };
-
-    document.addEventListener("selectionchange", handleSelectionChange);
-    return () => document.removeEventListener("selectionchange", handleSelectionChange);
-  }, []);
-
-  // Fungsi untuk menerapkan format ke teks yang diseleksi
-  const applyFormatToSelection = (command: string, value?: string) => {
-    const selection = window.getSelection();
-    const savedRange = savedSelectionRangeRef.current;
-
-    // Kembalikan seleksi yang sempat hilang ketika kontrol toolbar menerima fokus.
-    if (selection && savedRange) {
-      selection.removeAllRanges();
-      selection.addRange(savedRange);
-    }
-
-    if (command === "fontSizePx" && value) {
-      // execCommand fontSize hanya mendukung nilai 1–7. Gunakan nilai
-      // sementara lalu ubah hasilnya menjadi ukuran px yang dapat dikustom.
-      const editor = savedRange
-        ? (savedRange.commonAncestorContainer instanceof HTMLElement
-          ? savedRange.commonAncestorContainer
-          : savedRange.commonAncestorContainer.parentElement
-        )?.closest('[id^="main-editor-"]')
-        : null;
-      const existingLargeFonts = new Set(editor?.querySelectorAll('font[size="7"]') ?? []);
-
-      document.execCommand("fontSize", false, "7");
-
-      editor?.querySelectorAll<HTMLElement>('font[size="7"]').forEach((fontElement) => {
-        if (!existingLargeFonts.has(fontElement)) {
-          fontElement.style.fontSize = `${value}px`;
-          fontElement.removeAttribute("size");
-        }
-      });
-    } else {
-      document.execCommand(command, false, value);
-    }
-    isUsingSelectionToolbarRef.current = false;
-    savedSelectionRangeRef.current = null;
-    // Reset selection toolbar setelah apply
-    setSelectionToolbar({ visible: false, x: 0, y: 0 });
-    setSelectText("");
-  };
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { useTheme } from "next-themes";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, getDocs } from "firebase/firestore";
+import { Authentication, LastDocument } from "../firebase/firebase.configuration";
+import {
+  FileText,
+  Plus,
+  Search,
+  LayoutGrid,
+  List as ListIcon,
+  Clock,
+  Moon,
+  Sun,
+  User,
+  X,
+  Trash2,
+} from "lucide-react";
+import { ClearAutoSave, ListAutoSaves } from "@/components/autosave";
+
+//bentuk satu baris dokumen di daftar "dokumen terakhir"
+type DocumentItem = {
+  id: string;
+  title: string;
+  snippet: string;
+  pageCount: number;
+  savedAt: number;
+  //alamat dokumennya, disusun dari nama + id yang tersimpan bersama naskah
+  href: string;
+};
+
+//ubah innerHTML editor jadi teks polos supaya bisa dipakai judul & cuplikan
+function getPlainText(html: string) {
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  return (container.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+//format waktu simpan jadi kalimat yang gampang dibaca
+function formatSavedTime(savedAt: number) {
+  const elapsed = Date.now() - savedAt;
+  const minutes = Math.floor(elapsed / 60000);
+
+  if (minutes < 1) return "baru saja";
+  if (minutes < 60) return `${minutes} menit lalu`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} jam lalu`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} hari lalu`;
+
+  return new Date(savedAt).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+//tombol ganti tema, dipisah supaya tidak ikut render sebelum mounting selesai
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [isMounted, setIsMounted] = useState(false);
+
+  //next-themes baru tahu tema asli setelah render di browser
+  useEffect(() => setIsMounted(true), []);
 
   return (
-    <>
-      <div className="relative flex flex-col items-center min-h-screen bg-[#D9E4D1]/50 dark:bg-[#0D0606]/50 font-sans overflow-x-hidden py-12 transition-colors duration-300">
-        <Analytics />
-        {/* Sidebars */}
-        <SidebarLeft />
-        <SidebarRight onImageUpload={handleImageUpload} selectedPageIndex={selectedPage} />
+    <button
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      aria-label="Ganti tema"
+      className="p-2.5 rounded-full text-[#0D0606] dark:text-[#D9E4D1] hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 transition-colors"
+    >
+      {isMounted && resolvedTheme === "dark" ? (
+        <Sun className="w-[18px] h-[18px]" />
+      ) : (
+        <Moon className="w-[18px] h-[18px]" />
+      )}
+    </button>
+  );
+}
 
-        {/* Main Content Area */}
-        <main className="relative z-10 w-full flex flex-col items-center justify-start sm:p-4 transition-all duration-500 min-h-[85vh] md:pl-[23rem] md:pr-72 pt-20">
+//kertas mini yang jadi thumbnail dokumen — meniru bentuk halaman di editor
+function PaperPreview({ snippet }: { snippet: string }) {
+  return (
+    <div className="relative h-40 sm:h-44 overflow-hidden bg-[#D9E4D1] dark:bg-[#0D0606] border-b border-[#0D0606]/10 dark:border-[#D9E4D1]/10">
+      <div className="absolute inset-x-4 top-4 bottom-0 bg-white/50 dark:bg-white/5 rounded-t-sm shadow-sm px-3 pt-3">
+        <p className="text-[7px] leading-[1.5] text-[#0D0606]/60 dark:text-[#D9E4D1]/50 line-clamp-[12] break-words">
+          {snippet}
+        </p>
+      </div>
+    </div>
+  );
+}
 
-          {/* Paper Editor Container (Wadah Kertas Utama) */}
-          {/* Container for scrolling multiple pages */}
-          <div className="w-[calc(100%-2rem)] sm:w-full max-w-[var(--paper-max-width,794px)] flex flex-col gap-8 pb-32">
+export default function Home() {
+  //daftar dokumen dibaca dari localStorage, jadi hanya tersedia di browser
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-            {/* Loop per halaman paper berdasarkan pageNumber state */}
-            {Array.from({ length: pageNumber }).map((_, index) => (
-              <motion.div
-                key={index}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                className={`relative flex flex-col bg-[#D9E4D1] dark:bg-[#0D0606] shadow-2xl rounded-sm border-2 z-10 transition-all duration-300 ease-in-out w-full min-h-[85vh] cursor-pointer ${selectedPage === index
-                  ? 'border-blue-500 dark:border-blue-400 shadow-blue-200/30 dark:shadow-blue-900/20'
-                  : 'border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
-                  }`}
-                style={{
-                  backgroundColor: "var(--paper-color, #ffffff)",
-                }}
-                onClick={() => setSelectedPage(index)}
+  //kata kunci pencarian dan mode tampilan (grid seperti Docs, atau daftar)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  //foto profil dari akun yang sedang masuk, dipakai di pojok kanan atas
+  const [photoURL, setPhotoURL] = useState<string | null>(null);
+
+  useEffect(() => {
+    //tiap dokumen punya kuncinya sendiri sekarang, jadi daftarnya bisa lebih dari satu
+    const semua = ListAutoSaves();
+
+    setDocuments(
+      semua.flatMap((saved) => {
+        if (saved.halaman.length === 0) return [];
+
+        //cuplikan diambil dari seluruh isi naskah
+        const fullText = saved.halaman.map(getPlainText).join(" ").trim();
+        if (!fullText) return [];
+
+        //pakai nama yang diberi user; kalau masih bawaan, jatuh ke baris pertama naskah
+        const firstLine = getPlainText(saved.halaman[0]);
+        const title =
+          saved.name && saved.name !== "untitled"
+            ? saved.name
+            : firstLine.slice(0, 60) || "Dokumen Tanpa Judul";
+
+        return [{
+          id: saved.documentId,
+          title,
+          snippet: fullText.slice(0, 400),
+          pageCount: saved.pageNumber,
+          savedAt: saved.savedAt,
+          href: `/create_document/${encodeURIComponent(saved.name || "untitled")}/${saved.documentId}`,
+        }];
+      })
+    );
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    //pola yang sama dipakai di BottomBar untuk membaca akun yang sedang masuk
+    const unsubscribe = onAuthStateChanged(Authentication, async (user) => {
+      setPhotoURL(user?.photoURL || null);
+
+      //naskah di Firestore hanya bisa dibaca kalau ada akun yang masuk,
+      //karena aturannya membatasi tiap dokumen pada uid pemiliknya
+      if (!user) return;
+
+      try {
+        //create_document/last_document/<uid> — satu dokumen per naskah tersimpan
+        const snapshot = await getDocs(
+          collection(LastDocument, "create_document", "last_document", user.uid)
+        );
+
+        const dariFirestore = snapshot.docs.flatMap((entry) => {
+          const saved = entry.data() as {
+            name?: string;
+            pageNumber?: number;
+            halaman?: string[];
+            savedAt?: number;
+          };
+
+          const halaman = Array.isArray(saved.halaman) ? saved.halaman : [];
+          if (halaman.length === 0) return [];
+
+          const fullText = halaman.map(getPlainText).join(" ").trim();
+          if (!fullText) return [];
+
+          const firstLine = getPlainText(halaman[0]);
+          const name = saved.name || "untitled";
+          const title =
+            name !== "untitled"
+              ? name
+              : firstLine.slice(0, 60) || "Dokumen Tanpa Judul";
+
+          return [{
+            id: entry.id,
+            title,
+            snippet: fullText.slice(0, 400),
+            pageCount: saved.pageNumber ?? halaman.length,
+            savedAt: saved.savedAt ?? 0,
+            href: `/create_document/${encodeURIComponent(name)}/${entry.id}`,
+          }];
+        });
+
+        //gabungkan dengan yang sudah dibaca dari localStorage. Satu naskah bisa
+        //ada di dua tempat, jadi yang dipakai versi dengan waktu simpan terbaru.
+        setDocuments((sebelumnya) => {
+          const gabungan = new Map<string, DocumentItem>();
+
+          for (const item of [...sebelumnya, ...dariFirestore]) {
+            const lama = gabungan.get(item.id);
+            if (!lama || item.savedAt > lama.savedAt) gabungan.set(item.id, item);
+          }
+
+          return [...gabungan.values()].sort((a, b) => b.savedAt - a.savedAt);
+        });
+      } catch (error) {
+        console.log("baca dokumen dari Firestore gagal", error);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  //dokumen yang sedang menunggu konfirmasi hapus. Menghapus naskah tidak bisa
+  //dibatalkan, jadi selalu lewat dialog dulu — bukan langsung dari sekali klik.
+  const [pendingDelete, setPendingDelete] = useState<DocumentItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteDocument = async (item: DocumentItem) => {
+    setIsDeleting(true);
+
+    //naskah bisa hidup di dua tempat; keduanya dibersihkan di dalam ClearAutoSave.
+    //uid diambil di sini supaya terlihat jelas bahwa penghapusan salinan Firestore
+    //bergantung pada akun yang sedang masuk.
+    const user = Authentication.currentUser;
+    await ClearAutoSave(item.id, user?.uid);
+
+    setDocuments((sebelumnya) => sebelumnya.filter((doc) => doc.id !== item.id));
+    setPendingDelete(null);
+    setIsDeleting(false);
+  };
+
+  //saring dokumen berdasarkan kata kunci di judul maupun isi naskah
+  const filteredDocuments = useMemo(() => {
+    const keyword = searchQuery.trim().toLowerCase();
+    if (!keyword) return documents;
+
+    return documents.filter(
+      (doc) =>
+        doc.title.toLowerCase().includes(keyword) ||
+        doc.snippet.toLowerCase().includes(keyword)
+    );
+  }, [documents, searchQuery]);
+
+  return (
+    <div className="min-h-screen bg-[#D9E4D1]/50 dark:bg-[#0D0606]/50 font-sans transition-colors duration-300">
+      {/* Bilah atas — logo, pencarian, akun */}
+      <header className="sticky top-0 z-40 animate-fade-in-down backdrop-blur-xl bg-[#D9E4D1]/70 dark:bg-[#0D0606]/70 border-b border-[#0D0606]/10 dark:border-[#D9E4D1]/10">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center gap-3 sm:gap-6">
+          <Link href="/" className="flex items-center gap-2.5 shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-[#0D0606] dark:bg-[#D9E4D1] flex items-center justify-center">
+              <FileText className="w-4 h-4 text-[#D9E4D1] dark:text-[#0D0606]" />
+            </div>
+            {/* Nama produk disembunyikan di layar kecil supaya kolom cari dapat ruang */}
+            <span className="hidden sm:block font-semibold tracking-tight text-[#0D0606] dark:text-[#D9E4D1]">
+              Gravity AI
+            </span>
+          </Link>
+
+          {/* Kolom pencarian */}
+          <div className="flex-1 min-w-0 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#0D0606]/40 dark:text-[#D9E4D1]/40 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Telusuri dokumen"
+              className="w-full h-11 pl-11 pr-10 rounded-full text-sm bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 text-[#0D0606] dark:text-[#D9E4D1] placeholder:text-[#0D0606]/40 dark:placeholder:text-[#D9E4D1]/40 border border-transparent focus:border-[#0D0606]/20 dark:focus:border-[#D9E4D1]/20 focus:bg-[#0D0606]/[0.03] dark:focus:bg-[#D9E4D1]/5 outline-none transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                aria-label="Hapus pencarian"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-[#0D0606]/50 dark:text-[#D9E4D1]/50 hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 transition-colors"
               >
-
-                {/* Page number badge — selalu tampil di kiri atas setiap halaman */}
-                <div data-export-ignore="true" className={`absolute top-3 left-3 px-2 py-0.5 rounded-md text-[10px] font-bold z-20 transition-colors ${selectedPage === index
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 text-[#0D0606]/70 dark:text-[#D9E4D1]/70'
-                  }`}>
-                  {index + 1}
-                </div>
-
-
-
-                {/* Typable Document Area (Area Tempat Mengetik Naskah) */}
-                <style>{`
-                #main-editor-${index}:empty:before {
-                  content: attr(data-placeholder);
-                  color: #d4d4d8; /* text-zinc-300 */
-                  pointer-events: none;
-                }
-                .dark #main-editor-${index}:empty:before {
-                  color: rgba(63, 63, 70, 0.5); /* dark:text-zinc-700/50 */
-                }
-              `}</style>
-                <div
-                  id={`main-editor-${index}`}
-                  contentEditable
-                  suppressContentEditableWarning
-                  className="absolute inset-0 w-full h-full outline-none py-16 pr-12 pl-24 text-[#0D0606] dark:text-[#D9E4D1] scrollbar-hide overflow-hidden whitespace-pre-wrap focus:outline-none z-10"
-                  data-placeholder={index === 0 ? "Mulai menulis naskah atau klik area ini..." : ""}
-                  style={{
-                    fontFamily: "var(--editor-font-family, 'Inter')",
-                    fontSize: "var(--editor-font-size, 16px)",
-                    fontWeight: "var(--editor-font-weight, 400)",
-                    textAlign: "var(--editor-text-align, start)" as any,
-                    color: "var(--editor-font-color, #000000)",
-                  }}
-                />
-
-                {/* Draggable Images (hanya render di kertas pertama untuk sekarang, atau atur by page nanti) */}
-                {index === 0 && uploadedImages.map((img) => (
-                  <motion.div
-                    key={img.id}
-                    drag
-                    dragMomentum={false}
-                    initial={{ x: img.x, y: img.y }}
-                    // Posisi hasil geser disimpan ke state supaya ikut terbawa autosave.
-                    // initial hanya berlaku saat mount, jadi tidak menimpa posisi drag.
-                    onDragEnd={(event, info) => {
-                      setUploadedImages((prev) => prev.map((item) => item.id === img.id
-                        ? { ...item, x: item.x + info.offset.x, y: item.y + info.offset.y }
-                        : item));
-                    }}
-                    onPointerDown={() => setSelectedImageId(img.id)}
-                    className="absolute z-50 cursor-move group"
-                    style={{ touchAction: "none" }}
-                  >
-                    <div className="relative">
-                      <img
-                        src={img.src}
-                        alt="Uploaded content"
-                        data-paper-uploaded-image="true"
-                        className={`max-w-[300px] max-h-[300px] object-contain rounded-lg shadow-sm border transition-colors pointer-events-auto ${selectedImageId === img.id
-                          ? "border-blue-500 dark:border-blue-400"
-                          : "border-transparent group-hover:border-zinc-300 dark:group-hover:border-zinc-700"
-                          }`}
-                        draggable={false} // Mencegah perilaku drag bawaan browser pada gambar
-                      />
-                      {/* Delete button (only visible on hover) */}
-                      <button
-                        onClick={() => setUploadedImages(prev => prev.filter(i => i.id !== img.id))}
-                        data-export-ignore="true"
-                        className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 pointer-events-auto"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            ))}
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        </main>
 
-        {/* Floating Paper Controls — ngambang di sisi kanan layar */}
-        <AnimatePresence>
-          {selectedPage !== null && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="fixed top-20 sm:top-30 right-2 sm:right-6 xl:right-[calc(49.3%-var(--paper-max-width,794px)/2-6rem)] flex flex-col items-center p-1.5 gap-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-xl shadow-lg border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 rounded-3xl z-50"
-            >
-              <button
-                onClick={() => handleAddPaper()}
-                className="p-2.5 text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:text-zinc-900 dark:text-[#0D0606]/50 dark:text-[#D9E4D1]/50 dark:hover:text-white bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-xl transition-all"
-                title="Tambah Halaman"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              <span className="text-sm font-semibold text-[#0D0606] dark:text-[#D9E4D1]">
-                {(selectedPage ?? 0) + 1}/{pageNumber}
-              </span>
-              <button
-                onClick={() => handleDeletePaper()}
-                disabled={pageNumber <= 1}
-                className="p-2.5 text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:text-red-500 dark:text-[#0D0606]/50 dark:text-[#D9E4D1]/50 dark:hover:text-red-400 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-transparent"
-                title={`Hapus Halaman ${(selectedPage ?? 0) + 1}`}
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          <div className="flex items-center gap-1 shrink-0">
+            <ThemeToggle />
+            {/* Avatar akun; ikon biasa dipakai kalau belum masuk */}
+            <div className="w-9 h-9 rounded-full overflow-hidden bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 flex items-center justify-center">
+              {photoURL ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photoURL} alt="Foto profil" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-4 h-4 text-[#0D0606]/50 dark:text-[#D9E4D1]/50" />
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
 
-        {/* Floating Chat & Search Overlay — ngambang di atas semua konten */}
-        <div className="fixed top-24 left-2 right-2 sm:right-auto sm:left-6 bottom-20 md:bottom-24 sm:w-[22rem] z-40 flex flex-col pointer-events-auto bg-white/40 dark:bg-[#0D0606]/40 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-3xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)]">
-          {/* Chat Messages */}
-          <AnimatePresence>
-            {isChatActive && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10, transition: { duration: 0.2 } }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-                className="flex flex-col gap-4 w-full flex-1 mb-4 overflow-y-auto scrollbar-hide p-3 bg-white/50 dark:bg-black/20 backdrop-blur-xl rounded-2xl border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 shadow-inner"
-                ref={chatContainerRef}
-              >
-                <div className="flex justify-between items-center w-full mb-2 border-b border-[#0D0606]/20 dark:border-[#D9E4D1]/20 pb-2 sticky top-0 bg-[#D9E4D1] dark:bg-[#0D0606] backdrop-blur-xl z-10 px-2 rounded-t-xl -mt-2 pt-2">
-                  <span className="text-xs font-medium text-[#0D0606]/70 dark:text-[#D9E4D1]/70 uppercase tracking-widest pl-2">LibraAI</span>
-                  <button
-                    onClick={() => setIsChatActive(false)}
-                    className="p-1.5 rounded-full text-[#0D0606]/50 dark:text-[#D9E4D1]/50 hover:bg-zinc-200/50 dark:hover:bg-zinc-800 hover:text-[#0D0606] dark:hover:text-[#D9E4D1] transition-colors"
-                    title="Sembunyikan Obrolan"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6">
+        {/* Baris "mulai dokumen baru" */}
+        <section className="pt-8 pb-10 animate-fade-in-up stagger-1">
+          <h2 className="text-sm font-medium text-[#0D0606] dark:text-[#D9E4D1] mb-4">
+            Mulai dokumen baru
+          </h2>
 
-                <div className="flex flex-col gap-6 px-1 pb-2">
-                  {chatHistory.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start w-full'}`}>
-                      <div className={`${msg.role === 'user' ? 'bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-tr-sm max-w-[85%]' : 'bg-[#0D0606] dark:bg-[#D9E4D1] rounded-tl-sm w-fit max-w-[95%] text-[#D9E4D1] dark:text-[#0D0606]'} px-5 py-4 rounded-2xl shadow-sm overflow-x-auto`}>
-                        {msg.reasoning && (
-                          <div className="mb-3 p-3 bg-white/5 dark:bg-black/10 rounded-xl text-xs italic opacity-80 whitespace-pre-wrap border border-white/10 dark:border-black/5">
-                            <div className="flex items-center gap-1.5 mb-1.5 font-semibold opacity-70">
-                                <Network className="w-3.5 h-3.5" />
-                                <span>Thinking...</span>
-                            </div>
-                            <Markdown>{msg.reasoning}</Markdown>
-                          </div>
-                        )}
-                        <div className={`font-medium leading-relaxed text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'text-[#0D0606] dark:text-[#D9E4D1]' : ''}`}>
-                          {msg.role === 'user' ? msg.content : <Markdown>{msg.content}</Markdown>}
-                        </div>
-                        {/* Tombol "Tulis ke Paper" — hanya muncul di respons AI */}
-                        {msg.role === 'friend' && (
-                          <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[#0D0606]/10 dark:border-[#D9E4D1]/10">
-                            <button
-                              onClick={() => insertToPaper(msg.content, idx)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${insertedIndex === idx
-                                ? 'bg-green-500/20 text-green-300 dark:text-green-600'
-                                : 'bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 text-white/70 dark:text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:bg-white/20 dark:hover:bg-zinc-700/50 hover:text-white dark:hover:text-zinc-300'
-                                }`}
-                              title="Tulis ke Paper"
-                            >
-                              {insertedIndex === idx ? (
-                                <><Check className="w-3.5 h-3.5" /> Berhasil!</>
-                              ) : (
-                                <><PenTool className="w-3.5 h-3.5" /> Tulis ke Paper</>
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {isLoading && (
-                    <div className="flex justify-start w-full">
-                      <div className="bg-[#0D0606] dark:bg-[#D9E4D1] px-5 py-4 rounded-2xl rounded-tl-sm w-fit shadow-md">
-                        <div className="flex gap-1.5 items-center justify-center h-4 px-2">
-                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                          <span className="w-2 h-2 bg-zinc-400 dark:bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Quick Action Buttons — muncul saat chat belum aktif */}
-          <AnimatePresence>
-            {!isChatActive && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 5, transition: { duration: 0.15 } }}
-                transition={{ duration: 0.3 }}
-                className="grid grid-cols-2 gap-2 w-full mb-3"
-              >
-                <button
-                  onClick={() => setQuickActionModal({ open: true, type: 'paper_research', label: 'Research' })}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 rounded-xl text-xs w-full justify-center font-semibold text-[#0D0606] dark:text-[#D9E4D1] hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  Buat Research
-                </button>
-                <button
-                  onClick={() => setQuickActionModal({ open: true, type: 'paper_skripsi', label: 'Skripsi' })}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 rounded-xl text-xs w-full justify-center font-semibold text-[#0D0606] dark:text-[#D9E4D1] hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
-                >
-                  <GraduationCap className="w-3.5 h-3.5" />
-                  Buat Skripsi
-                </button>
-                <button
-                  onClick={() => setQuickActionModal({ open: true, type: 'paper_artikel', label: 'Artikel Ilmiah' })}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0D0606]/5 dark:bg-[#D9E4D1]/5 border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 rounded-xl text-xs w-full justify-center font-semibold text-[#0D0606] dark:text-[#D9E4D1] hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all shadow-sm hover:shadow-md active:scale-95"
-                >
-                  <Newspaper className="w-3.5 h-3.5" />
-                  Buat Artikel
-                </button>
-                <div className="w-[1px] h-6 bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 mx-1"></div>
-                <button
-                  onClick={() => setIsMoreFeaturesOpen(!isMoreFeaturesOpen)}
-                  className={`flex items-center justify-center p-2 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95 border ${isMoreFeaturesOpen
-                    ? 'bg-[#0D0606]/20 dark:bg-[#D9E4D1]/20 border-zinc-300 dark:border-zinc-600 text-[#0D0606] dark:text-[#D9E4D1]'
-                    : 'bg-white/90 dark:bg-zinc-800/90 border-[#0D0606]/20 dark:border-[#D9E4D1]/20 text-[#0D0606] dark:text-[#D9E4D1] hover:bg-zinc-100 dark:hover:bg-zinc-700'
-                    }`}
-                  title="Fitur Lainnya"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Quick Action Buttons — Row 2 (AI Features 1-8) */}
-          <AnimatePresence>
-            {!isChatActive && isMoreFeaturesOpen && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, scale: 0.95 }}
-                animate={{ opacity: 1, height: 'auto', scale: 1 }}
-                exit={{ opacity: 0, height: 0, scale: 0.95, transition: { duration: 0.15 } }}
-                transition={{ duration: 0.3 }}
-                className="grid grid-cols-2 gap-2 w-full mb-4 overflow-y-auto"
-              >
-                {/* 1. Auto-Citation */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'citation' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/80 dark:border-blue-800/50 rounded-lg text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
-                  <LinkIcon className="w-3.5 h-3.5" /> Sitasi & Pustaka
-                </button>
-
-                {/* 2. Upload PDF (Chat with Papers) */}
-                <div className="relative">
-                  <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="Upload Jurnal PDF" />
-                  <button className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-purple-50/80 dark:bg-purple-900/20 border border-purple-200/80 dark:border-purple-800/50 rounded-lg text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md pointer-events-none">
-                    <Upload className="w-3.5 h-3.5" /> Chat w/ Papers
-                  </button>
-                </div>
-
-                {/* 3. Paraphraser */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'paraphrase' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-emerald-50/80 dark:bg-emerald-900/20 border border-emerald-200/80 dark:border-emerald-800/50 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
-                  <Edit3 className="w-3.5 h-3.5" /> Academic Tone
-                </button>
-
-                {/* 4. Math Equation LaTeX */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'math' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-amber-50/80 dark:bg-amber-900/20 border border-amber-200/80 dark:border-amber-800/50 rounded-lg text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
-                  <Calculator className="w-3.5 h-3.5" /> Math Equation
-                </button>
-
-                {/* 5. Auto Abstract */}
-                <button onClick={handleAutoAbstract} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-rose-50/80 dark:bg-rose-900/20 border border-rose-200/80 dark:border-rose-800/50 rounded-lg text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
-                  <AlignLeft className="w-3.5 h-3.5" /> Auto Abstrak
-                </button>
-
-                {/* 6. Virtual Advisor */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'advisor' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-indigo-50/80 dark:bg-indigo-900/20 border border-indigo-200/80 dark:border-indigo-800/50 rounded-lg text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
-                  <MessageSquare className="w-3.5 h-3.5" /> Virtual Advisor
-                </button>
-
-                {/* 7. Table Formatter */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'table' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-cyan-50/80 dark:bg-cyan-900/20 border border-cyan-200/80 dark:border-cyan-800/50 rounded-lg text-xs font-semibold text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
-                  <Table className="w-3.5 h-3.5" /> Data ke Tabel
-                </button>
-
-                {/* 8. Smart Outline */}
-                <button onClick={() => setFeatureModal({ open: true, type: 'outline' })} className="w-full justify-center flex items-center gap-1.5 px-2 py-2 bg-orange-50/80 dark:bg-orange-900/20 border border-orange-200/80 dark:border-orange-800/50 rounded-lg text-xs font-semibold text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-all shadow-sm active:scale-95 backdrop-blur-md">
-                  <Network className="w-3.5 h-3.5" /> Smart Outline
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Search Input — selalu terlihat di bawah layar */}
-          <motion.div
-            layout
-            className="w-full mt-auto relative group shrink-0"
+          <Link
+            href="/create_document"
+            className="group block w-[132px] active:scale-[0.97] transition-transform duration-200"
           >
-            <div className={`absolute inset-0 bg-zinc-900/5 dark:bg-white/5 rounded-2xl blur-xl transition-all duration-300 ${isFocused ? "opacity-100 scale-105" : "opacity-0 scale-100"}`} />
+            <div className="h-[172px] rounded-lg border border-[#0D0606]/15 dark:border-[#D9E4D1]/15 bg-white/50 dark:bg-[#D9E4D1]/5 flex items-center justify-center group-hover:border-[#0D0606]/50 dark:group-hover:border-[#D9E4D1]/50 transition-colors">
+              <Plus className="w-8 h-8 text-[#0D0606]/40 dark:text-[#D9E4D1]/40 group-hover:text-[#0D0606] dark:group-hover:text-[#D9E4D1] transition-colors" />
+            </div>
+            <p className="mt-2.5 text-sm font-medium text-[#0D0606] dark:text-[#D9E4D1]">
+              Kosong
+            </p>
+          </Link>
+        </section>
 
-            <div className={`relative flex items-center bg-[#D9E4D1]/90 dark:bg-[#0D0606]/90 backdrop-blur-xl border-2 rounded-2xl p-2 transition-colors duration-300 shadow-2xl shadow-zinc-300/30 dark:shadow-black/50 ${isFocused ? "border-[#0D0606] dark:border-[#D9E4D1]" : "border-zinc-200/80 dark:border-zinc-800/80"}`}>
-              <div className="pl-4 pr-3">
-                <Search className={`w-5 h-5 transition-colors duration-300 ${isFocused ? "text-[#0D0606] dark:text-[#D9E4D1]" : "text-[#0D0606]/50 dark:text-[#D9E4D1]/50"}`} />
-              </div>
+        {/* Daftar dokumen terakhir */}
+        <section className="pb-16">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <h2 className="text-sm font-medium text-[#0D0606] dark:text-[#D9E4D1]">
+              Dokumen terakhir
+            </h2>
 
-              {/* Input Teks untuk ngobrol dengan AI */}
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Tanya LibraAI tentang Research, Skripsi, atau Artikel Ilmiah"
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                className="w-full bg-transparent border-none outline-none py-3 pr-4 text-[#0D0606] dark:text-[#D9E4D1] placeholder:text-[#0D0606]/50 dark:text-[#D9E4D1]/50 text-sm font-medium"
-              />
+            {/* Pengalih tampilan grid / daftar */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-full bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10">
               <button
-                onClick={handleStart}
-                className="hidden sm:flex items-center justify-center gap-2 bg-[#0D0606] dark:bg-[#D9E4D1] hover:bg-zinc-800 dark:hover:bg-zinc-200 text-[#D9E4D1] dark:text-[#0D0606] w-12 h-12 rounded-xl font-medium transition-all shadow-sm active:scale-95 group-hover:shadow-md border border-transparent dark:border-zinc-200">
-                <Send className="w-5 h-5 ml-1" />
+                onClick={() => setViewMode("grid")}
+                aria-label="Tampilan grid"
+                className={`p-2 rounded-full transition-colors ${
+                  viewMode === "grid"
+                    ? "bg-[#0D0606] dark:bg-[#D9E4D1] text-[#D9E4D1] dark:text-[#0D0606]"
+                    : "text-[#0D0606]/50 dark:text-[#D9E4D1]/50 hover:text-[#0D0606] dark:hover:text-[#D9E4D1]"
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                aria-label="Tampilan daftar"
+                className={`p-2 rounded-full transition-colors ${
+                  viewMode === "list"
+                    ? "bg-[#0D0606] dark:bg-[#D9E4D1] text-[#D9E4D1] dark:text-[#0D0606]"
+                    : "text-[#0D0606]/50 dark:text-[#D9E4D1]/50 hover:text-[#0D0606] dark:hover:text-[#D9E4D1]"
+                }`}
+              >
+                <ListIcon className="w-4 h-4" />
               </button>
             </div>
-          </motion.div>
-        </div>
-      </div>
+          </div>
 
-      {/* Selection Toolbar — muncul saat teks di-select */}
-      <AnimatePresence>
-        {selectionToolbar.visible && SelectText && (
-          <motion.div
-            ref={selectionToolbarRef}
-            initial={{ opacity: 0, y: 5, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 5, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            onPointerDownCapture={() => {
-              isUsingSelectionToolbarRef.current = true;
-            }}
-            className="fixed z-[200] flex items-center gap-1 bg-[#0D0606] dark:bg-[#D9E4D1] rounded-xl px-2 py-1.5 shadow-2xl border border-zinc-700 dark:border-zinc-300"
-            style={{
-              left: `${selectionToolbar.x}px`,
-              top: `${selectionToolbar.y}px`,
-              transform: 'translate(-50%, -100%)',
-            }}
-          >
-            {/* Bold */}
-            <button onClick={() => applyFormatToSelection('bold')} className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors text-xs font-bold" title="Bold">B</button>
-            {/* Italic */}
-            <button onClick={() => applyFormatToSelection('italic')} className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors text-xs italic" title="Italic">I</button>
-            {/* Underline */}
-            <button onClick={() => applyFormatToSelection('underline')} className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors text-xs underline" title="Underline">U</button>
-            <div className="w-px h-5 bg-white/20 dark:bg-black/10 mx-0.5" />
-            {/* Font Size — ketik ukuran dalam px, lalu tekan Enter */}
-            <input
-              type="number"
-              min="8"
-              max="96"
-              value={customFontSize}
-              onChange={(e) => setCustomFontSize(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  const size = Math.min(96, Math.max(8, Number(customFontSize) || 16));
-                  setCustomFontSize(String(size));
-                  applyFormatToSelection("fontSizePx", String(size));
-                }
-              }}
-              className="w-14 bg-transparent text-[#D9E4D1] dark:text-[#0D0606] text-xs outline-none px-1 py-1 rounded-lg hover:bg-white/20 dark:hover:bg-black/10"
-              title="Ukuran font (8–96 px), tekan Enter untuk menerapkan"
-              aria-label="Ukuran font dalam pixel"
-            />
-            <div className="w-px h-5 bg-white/20 dark:bg-black/10 mx-0.5" />
-            {/* Font Change (font family) */}
-            <select
-              onChange={(e) => { applyFormatToSelection('fontName', e.target.value); }}
-              className="bg-transparent text-[#D9E4D1] dark:text-[#0D0606] text-xs outline-none cursor-pointer px-1 py-1 rounded-lg hover:bg-white/20 dark:hover:bg-black/10"
-              defaultValue=""
-              title="Jenis Font"
-            >
-              <option value="" disabled className="text-zinc-900">Font</option>
-              <option value="Inter" className="text-zinc-900">Inter</option>
-              <option value="Times New Roman" className="text-zinc-900">Times New Roman</option>
-              <option value="Geist" className="text-zinc-900">Geist</option>
-              <option value="Georgia" className="text-zinc-900">Georgia</option>
-              <option value="Arial" className="text-zinc-900">Arial</option>
-              <option value="Courier New" className="text-zinc-900">Courier New</option>
-            </select>
-            <div className="w-px h-5 bg-white/20 dark:bg-black/10 mx-0.5" />
-            {/* Font Color */}
-            <label className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors cursor-pointer text-xs" title="Warna Teks">
-              🎨
-              <input
-                type="color"
-                className="sr-only"
-                onChange={(e) => applyFormatToSelection('foreColor', e.target.value)}
-              />
-            </label>
-            {/* Highlight */}
-            <label className="p-1.5 text-[#D9E4D1] dark:text-[#0D0606] hover:bg-white/20 dark:hover:bg-black/10 rounded-lg transition-colors cursor-pointer text-xs" title="Highlight">
-              🖍️
-              <input
-                type="color"
-                className="sr-only"
-                onChange={(e) => applyFormatToSelection('hiliteColor', e.target.value)}
-              />
-            </label>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          {/* Keadaan kosong: belum ada naskah sama sekali */}
+          {!isLoading && documents.length === 0 && (
+            <div className="py-20 text-center animate-scale-in">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#0D0606]/5 dark:bg-[#D9E4D1]/10 flex items-center justify-center">
+                <FileText className="w-6 h-6 text-[#0D0606]/40 dark:text-[#D9E4D1]/40" />
+              </div>
+              <p className="mt-4 text-sm font-medium text-[#0D0606] dark:text-[#D9E4D1]">
+                Belum ada dokumen
+              </p>
+              <p className="mt-1.5 text-sm text-[#0D0606]/60 dark:text-[#D9E4D1]/60">
+                Dokumen yang kamu tulis akan muncul di sini.
+              </p>
+            </div>
+          )}
 
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toast.visible && (
-          <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.3 }}
-            className="fixed top-6 right-6 z-[100] bg-[#0D0606] dark:bg-[#D9E4D1] text-[#D9E4D1] dark:text-[#0D0606] px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold border border-zinc-700 dark:border-zinc-200"
-          >
-            {toast.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          {/* Keadaan kosong: ada dokumen, tapi tidak cocok dengan pencarian */}
+          {!isLoading && documents.length > 0 && filteredDocuments.length === 0 && (
+            <div className="py-20 text-center animate-fade-in">
+              <p className="text-sm font-medium text-[#0D0606] dark:text-[#D9E4D1]">
+                Tidak ada yang cocok dengan &ldquo;{searchQuery}&rdquo;
+              </p>
+              <p className="mt-1.5 text-sm text-[#0D0606]/60 dark:text-[#D9E4D1]/60">
+                Coba kata kunci lain.
+              </p>
+            </div>
+          )}
 
-      {/* Quick Action Modal — Dialog untuk masukkan topik */}
-      {/* Feature Input Modal */}
-      <AnimatePresence>
-        {featureModal.open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-[#D9E4D1] dark:bg-[#0D0606] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-[#0D0606]/20 dark:border-[#D9E4D1]/20"
-            >
-              <div className="p-5 border-b border-[#0D0606]/10 dark:border-[#D9E4D1]/10 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-xl">
-                    {featureModal.type === 'citation' && <LinkIcon className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
-                    {featureModal.type === 'paraphrase' && <Edit3 className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
-                    {featureModal.type === 'math' && <Calculator className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
-                    {featureModal.type === 'advisor' && <MessageSquare className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
-                    {featureModal.type === 'table' && <Table className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
-                    {featureModal.type === 'outline' && <Network className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
+          {/* Tampilan grid — kartu dengan pratinjau kertas */}
+          {viewMode === "grid" && filteredDocuments.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredDocuments.map((doc, index) => (
+                <motion.div
+                  key={doc.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.04, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {/* relative supaya tombol hapus bisa mengambang di atas kartu */}
+                  <div className="relative">
+                    <Link
+                      href={doc.href}
+                      className="group block rounded-lg overflow-hidden border border-[#0D0606]/15 dark:border-[#D9E4D1]/15 hover:border-[#0D0606]/50 dark:hover:border-[#D9E4D1]/50 transition-colors"
+                    >
+                      <PaperPreview snippet={doc.snippet} />
+
+                      <div className="p-3 bg-white/40 dark:bg-[#D9E4D1]/5">
+                        <div className="flex items-start gap-2">
+                          <FileText className="w-4 h-4 mt-0.5 shrink-0 text-[#0D0606]/60 dark:text-[#D9E4D1]/60" />
+                          {/* pr-6 memberi ruang supaya judul panjang tidak tertutup tombol hapus */}
+                          <p className="text-sm font-medium leading-snug text-[#0D0606] dark:text-[#D9E4D1] line-clamp-2 pr-6">
+                            {doc.title}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-xs text-[#0D0606]/50 dark:text-[#D9E4D1]/50">
+                          {formatSavedTime(doc.savedAt)}
+                        </p>
+                      </div>
+                    </Link>
+
+                    {/* Tombol hapus berada di luar Link — kalau di dalam, kliknya
+                        ikut membuka dokumen sekalipun sudah preventDefault */}
+                    <button
+                      onClick={() => setPendingDelete(doc)}
+                      aria-label={`Hapus ${doc.title}`}
+                      title="Hapus dokumen"
+                      className="absolute bottom-2.5 right-2 p-1.5 rounded-full text-[#0D0606]/40 dark:text-[#D9E4D1]/40 hover:text-red-600 dark:hover:text-red-400 hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/10 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <h3 className="text-lg font-bold text-[#0D0606] dark:text-[#D9E4D1]">
-                    {featureModal.type === 'citation' && 'Buat Sitasi / Daftar Pustaka'}
-                    {featureModal.type === 'paraphrase' && 'Academic Tone Paraphraser'}
-                    {featureModal.type === 'math' && 'Buat Rumus Matematika'}
-                    {featureModal.type === 'advisor' && 'Virtual Advisor (Kritikus AI)'}
-                    {featureModal.type === 'table' && 'Data & Table Formatter'}
-                    {featureModal.type === 'outline' && 'Smart Outline Builder'}
-                  </h3>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {/* Tampilan daftar — satu baris per dokumen */}
+          {viewMode === "list" && filteredDocuments.length > 0 && (
+            <div className="rounded-xl overflow-hidden border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 divide-y divide-[#0D0606]/10 dark:divide-[#D9E4D1]/10">
+              {filteredDocuments.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center gap-3 pr-2 bg-white/40 dark:bg-[#D9E4D1]/5 hover:bg-[#0D0606]/5 dark:hover:bg-[#D9E4D1]/10 transition-colors animate-fade-in"
+                >
+                  <Link
+                    href={doc.href}
+                    className="flex flex-1 min-w-0 items-center gap-3 px-4 py-3.5"
+                  >
+                    <FileText className="w-4 h-4 shrink-0 text-[#0D0606]/60 dark:text-[#D9E4D1]/60" />
+
+                    <p className="flex-1 min-w-0 truncate text-sm font-medium text-[#0D0606] dark:text-[#D9E4D1]">
+                      {doc.title}
+                    </p>
+
+                    {/* Jumlah halaman disembunyikan di layar kecil supaya judul tidak terpotong */}
+                    <span className="hidden sm:block shrink-0 text-xs text-[#0D0606]/50 dark:text-[#D9E4D1]/50">
+                      {doc.pageCount} halaman
+                    </span>
+
+                    <span className="shrink-0 inline-flex items-center gap-1.5 text-xs text-[#0D0606]/50 dark:text-[#D9E4D1]/50">
+                      <Clock className="w-3.5 h-3.5" />
+                      {formatSavedTime(doc.savedAt)}
+                    </span>
+                  </Link>
+
+                  <button
+                    onClick={() => setPendingDelete(doc)}
+                    aria-label={`Hapus ${doc.title}`}
+                    title="Hapus dokumen"
+                    className="shrink-0 p-2 rounded-full text-[#0D0606]/40 dark:text-[#D9E4D1]/40 hover:text-red-600 dark:hover:text-red-400 hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => { setFeatureModal({ open: false, type: '' }); setFeatureInput(''); }}
-                  className="p-2 text-[#0D0606]/50 dark:text-[#D9E4D1]/50 hover:text-zinc-600 dark:hover:text-zinc-300 rounded-lg hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
 
-              <div className="p-5">
-                <label className="block text-sm font-medium text-[#0D0606] dark:text-[#D9E4D1] mb-2">
-                  {featureModal.type === 'citation' && 'Masukkan Judul / Link Jurnal / DOI:'}
-                  {featureModal.type === 'paraphrase' && 'Masukkan Teks yang Ingin Diubah:'}
-                  {featureModal.type === 'math' && 'Jelaskan Rumus yang Ingin Dibuat:'}
-                  {featureModal.type === 'advisor' && 'Masukkan Teks/Draf yang Ingin Dievaluasi:'}
-                  {featureModal.type === 'table' && 'Masukkan Data Mentah (CSV/Teks):'}
-                  {featureModal.type === 'outline' && 'Masukkan Topik/Judul Penelitian:'}
-                </label>
-                <textarea
-                  autoFocus
-                  value={featureInput}
-                  onChange={(e) => setFeatureInput(e.target.value)}
-                  placeholder={
-                    featureModal.type === 'citation' ? 'Contoh: https://doi.org/10.1016/j.eswa.2023...' :
-                      featureModal.type === 'paraphrase' ? 'Tulis teks santai/berantakan di sini...' :
-                        featureModal.type === 'math' ? 'Contoh: Rumus regresi linear berganda dengan 2 variabel independen' :
-                          featureModal.type === 'advisor' ? 'Contoh: Latar belakang ini membahas tentang...' :
-                            featureModal.type === 'table' ? 'Contoh: Nama, Umur, Nilai\nAndi, 20, 85\nBudi, 21, 90' :
-                              'Contoh: Pengaruh AI terhadap Produktivitas Mahasiswa'
-                  }
-                  rows={4}
-                  className="w-full bg-[#D9E4D1] dark:bg-[#0D0606] border border-[#0D0606]/20 dark:border-[#D9E4D1]/20 rounded-xl px-4 py-3 text-sm text-[#0D0606] dark:text-[#D9E4D1] outline-none focus:ring-2 focus:ring-[#0D0606] dark:focus:ring-[#D9E4D1] transition-all resize-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (featureModal.type === 'citation') handleAutoCitation();
-                      else if (featureModal.type === 'paraphrase') handleParaphrase();
-                      else if (featureModal.type === 'math') handleMathEquation();
-                      else if (featureModal.type === 'advisor') handleVirtualAdvisor();
-                      else if (featureModal.type === 'table') handleTableFormatter();
-                      else if (featureModal.type === 'outline') handleOutlineBuilder();
-                    }
-                  }}
-                />
-              </div>
+      {/* Konfirmasi hapus — naskah yang sudah dibuang tidak bisa dikembalikan */}
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            onClick={() => !isDeleting && setPendingDelete(null)}
+            className="absolute inset-0 bg-[#0D0606]/40 backdrop-blur-sm animate-fade-in"
+          />
 
-              <div className="p-4 bg-[#D9E4D1] dark:bg-[#0D0606]/50 border-t border-[#0D0606]/10 dark:border-[#D9E4D1]/10 flex justify-end gap-2">
-                <button
-                  onClick={() => { setFeatureModal({ open: false, type: '' }); setFeatureInput(''); }}
-                  className="px-4 py-2 text-sm font-semibold text-[#0D0606]/70 dark:text-[#D9E4D1]/70 hover:text-[#0D0606] dark:hover:text-[#D9E4D1] transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  disabled={!featureInput.trim()}
-                  onClick={() => {
-                    if (featureModal.type === 'citation') handleAutoCitation();
-                    else if (featureModal.type === 'paraphrase') handleParaphrase();
-                    else if (featureModal.type === 'math') handleMathEquation();
-                    else if (featureModal.type === 'advisor') handleVirtualAdvisor();
-                    else if (featureModal.type === 'table') handleTableFormatter();
-                    else if (featureModal.type === 'outline') handleOutlineBuilder();
-                  }}
-                  className="px-5 py-2 text-sm font-semibold bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm active:scale-95"
-                >
-                  Minta AI
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <div className="relative w-full max-w-sm p-6 rounded-2xl bg-[#D9E4D1] dark:bg-[#0D0606] border border-[#0D0606]/10 dark:border-[#D9E4D1]/10 shadow-xl animate-scale-in">
+            <h3 className="text-base font-semibold text-[#0D0606] dark:text-[#D9E4D1]">
+              Hapus dokumen?
+            </h3>
+            <p className="mt-2 text-sm text-[#0D0606]/70 dark:text-[#D9E4D1]/70">
+              &ldquo;{pendingDelete.title}&rdquo; akan dihapus permanen. Tindakan ini
+              tidak bisa dibatalkan.
+            </p>
 
-      <AnimatePresence>
-        {quickActionModal.open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
-            onClick={() => { setQuickActionModal({ open: false, type: "", label: "" }); setQuickActionTopic(""); }}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.3 }}
-              className="bg-[#D9E4D1] dark:bg-[#0D0606] rounded-3xl p-8 w-full max-w-md shadow-2xl border border-[#0D0606]/20 dark:border-[#D9E4D1]/20"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2.5 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 rounded-xl">
-                  {quickActionModal.type === 'paper_research' && <BookOpen className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
-                  {quickActionModal.type === 'paper_skripsi' && <GraduationCap className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
-                  {quickActionModal.type === 'paper_artikel' && <Newspaper className="w-5 h-5 text-[#0D0606] dark:text-[#D9E4D1]" />}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-[#0D0606] dark:text-[#D9E4D1]">Buat {quickActionModal.label}</h3>
-                  <p className="text-xs text-[#0D0606]/70 dark:text-[#D9E4D1]/70">Masukkan topik, LibraAI akan langsung menulisnya ke paper</p>
-                </div>
-              </div>
-
-              <input
-                type="text"
-                value={quickActionTopic}
-                onChange={(e) => setQuickActionTopic(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') sendToAIForPaper(quickActionTopic, quickActionModal.type); }}
-                placeholder={`Contoh: Pengaruh AI terhadap pendidikan di Indonesia`}
-                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-[#0D0606]/20 dark:border-[#D9E4D1]/20 focus:border-zinc-900 dark:focus:border-white rounded-xl px-4 py-3 text-sm text-[#0D0606] dark:text-[#D9E4D1] placeholder:text-[#0D0606]/50 dark:text-[#D9E4D1]/50 outline-none transition-colors"
-                autoFocus
-              />
-
-              <div className="flex items-center gap-3 mt-6">
-                <button
-                  onClick={() => { setQuickActionModal({ open: false, type: "", label: "" }); setQuickActionTopic(""); }}
-                  className="flex-1 px-4 py-3 bg-[#0D0606]/10 dark:bg-[#D9E4D1]/10 text-[#0D0606] dark:text-[#D9E4D1] rounded-xl text-sm font-semibold hover:bg-[#0D0606]/20 dark:hover:bg-[#D9E4D1]/20 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={() => sendToAIForPaper(quickActionTopic, quickActionModal.type)}
-                  disabled={!quickActionTopic.trim() || isLoading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#0D0606] dark:bg-[#D9E4D1] text-[#D9E4D1] dark:text-[#0D0606] rounded-xl text-sm font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
-                >
-                  <PenTool className="w-4 h-4" />
-                  Generate & Tulis
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => setPendingDelete(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-full text-sm font-medium text-[#0D0606] dark:text-[#D9E4D1] hover:bg-[#0D0606]/10 dark:hover:bg-[#D9E4D1]/10 disabled:opacity-50 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => handleDeleteDocument(pendingDelete)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-full text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {isDeleting ? "Menghapus…" : "Hapus"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
