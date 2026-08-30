@@ -86,6 +86,79 @@ function ThemeToggle() {
   );
 }
 
+//satu rumpun kawung: empat elips mengelilingi satu titik pusat.
+//Dipisah jadi komponen supaya bisa ditanam di pusat maupun di keempat sudut tile
+//— sudut wajib ikut digambar agar sambungan antar tile menyatu.
+function KawungCluster({ cx, cy }: { cx: number; cy: number }) {
+  //garis dipertebal di dark mode — goresan terang di atas latar gelap
+  //terlihat lebih tipis daripada goresan gelap di atas latar terang
+  return (
+    <g
+      stroke="currentColor"
+      fill="none"
+      className="[stroke-width:1.6] dark:[stroke-width:2.2]"
+    >
+      <ellipse cx={cx} cy={cy - 15} rx="8" ry="14" />
+      <ellipse cx={cx} cy={cy + 15} rx="8" ry="14" />
+      <ellipse cx={cx - 15} cy={cy} rx="14" ry="8" />
+      <ellipse cx={cx + 15} cy={cy} rx="14" ry="8" />
+      <circle cx={cx} cy={cy} r="1.6" fill="currentColor" stroke="none" />
+    </g>
+  );
+}
+
+//truntum: bintang kecil bertabur, ditaruh di sela-sela rumpun kawung
+function TruntumStar({ cx, cy }: { cx: number; cy: number }) {
+  return (
+    <g
+      stroke="currentColor"
+      strokeLinecap="round"
+      className="[stroke-width:1.3] dark:[stroke-width:1.8]"
+    >
+      <line x1={cx - 4} y1={cy} x2={cx + 4} y2={cy} />
+      <line x1={cx} y1={cy - 4} x2={cx} y2={cy + 4} />
+      <line x1={cx - 2.6} y1={cy - 2.6} x2={cx + 2.6} y2={cy + 2.6} />
+      <line x1={cx - 2.6} y1={cy + 2.6} x2={cx + 2.6} y2={cy - 2.6} />
+      <circle cx={cx} cy={cy} r="1.2" fill="currentColor" stroke="none" />
+    </g>
+  );
+}
+
+//corak latar: kawung sebagai kisi utama, truntum mengisi sela-selanya.
+//Digambar sebagai SVG inline, bukan berkas gambar, supaya bisa memakai
+//currentColor — satu motif otomatis ikut warna tema.
+function BatikBackground() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-0 -z-10 text-[#0D0606] dark:text-[#D9E4D1] opacity-[0.10] dark:opacity-[0.13]"
+    >
+      <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="batik-kawung-truntum" width="80" height="80" patternUnits="userSpaceOnUse">
+            {/* rumpun di pusat tile */}
+            <KawungCluster cx={40} cy={40} />
+
+            {/* rumpun di keempat sudut — masing-masing tampil seperempat,
+                dan bertemu utuh dengan tile tetangganya */}
+            <KawungCluster cx={0} cy={0} />
+            <KawungCluster cx={80} cy={0} />
+            <KawungCluster cx={0} cy={80} />
+            <KawungCluster cx={80} cy={80} />
+
+            {/* truntum di titik terjauh dari semua rumpun kawung */}
+            <TruntumStar cx={20} cy={20} />
+            <TruntumStar cx={60} cy={20} />
+            <TruntumStar cx={20} cy={60} />
+            <TruntumStar cx={60} cy={60} />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#batik-kawung-truntum)" />
+      </svg>
+    </div>
+  );
+}
+
 //kertas mini yang jadi thumbnail dokumen — meniru bentuk halaman di editor
 function PaperPreview({ snippet }: { snippet: string }) {
   return (
@@ -298,7 +371,9 @@ export default function Home() {
   }, [documents, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-[#D9E4D1]/50 dark:bg-[#0D0606]/50 font-sans transition-colors duration-300">
+    <div className="relative min-h-screen bg-[#D9E4D1]/50 dark:bg-[#0D0606]/50 font-sans transition-colors duration-300">
+      <BatikBackground />
+
       {/* Bilah atas — logo, pencarian, akun */}
       <header className="sticky top-0 z-40 animate-fade-in-down backdrop-blur-xl bg-[#D9E4D1]/70 dark:bg-[#0D0606]/70 border-b border-[#0D0606]/10 dark:border-[#D9E4D1]/10">
         <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center gap-3 sm:gap-6">
