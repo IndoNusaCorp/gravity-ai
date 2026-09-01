@@ -18,7 +18,7 @@ type FontSettings = {
 
 // Daftar font tambahan yang diakses lewat tombol titik tiga.
 // hasBold = font punya berat 700 asli di Google Fonts (kalau tidak, browser yang menebalkan sendiri)
-const EXTRA_FONTS: { name: string; category: "Profesional" | "Imut"; hasBold: boolean }[] = [
+const EXTRA_FONTS: { name: string; category: "Profesional" | "Cute"; hasBold: boolean }[] = [
   // --- Profesional ---
   { name: "Roboto", category: "Profesional", hasBold: true },
   { name: "Open Sans", category: "Profesional", hasBold: true },
@@ -36,21 +36,21 @@ const EXTRA_FONTS: { name: string; category: "Profesional" | "Imut"; hasBold: bo
   { name: "PT Serif", category: "Profesional", hasBold: true },
   { name: "IBM Plex Serif", category: "Profesional", hasBold: true },
   // --- Imut ---
-  { name: "Quicksand", category: "Imut", hasBold: true },
-  { name: "Comfortaa", category: "Imut", hasBold: true },
-  { name: "Baloo 2", category: "Imut", hasBold: true },
-  { name: "Fredoka", category: "Imut", hasBold: true },
-  { name: "Nunito", category: "Imut", hasBold: true },
-  { name: "Grandstander", category: "Imut", hasBold: true },
-  { name: "Caveat", category: "Imut", hasBold: true },
-  { name: "Pacifico", category: "Imut", hasBold: false },
-  { name: "Patrick Hand", category: "Imut", hasBold: false },
-  { name: "Indie Flower", category: "Imut", hasBold: false },
-  { name: "Shadows Into Light", category: "Imut", hasBold: false },
-  { name: "Gloria Hallelujah", category: "Imut", hasBold: false },
-  { name: "Chewy", category: "Imut", hasBold: false },
-  { name: "Bubblegum Sans", category: "Imut", hasBold: false },
-  { name: "Schoolbell", category: "Imut", hasBold: false },
+  { name: "Quicksand", category: "Cute", hasBold: true },
+  { name: "Comfortaa", category: "Cute", hasBold: true },
+  { name: "Baloo 2", category: "Cute", hasBold: true },
+  { name: "Fredoka", category: "Cute", hasBold: true },
+  { name: "Nunito", category: "Cute", hasBold: true },
+  { name: "Grandstander", category: "Cute", hasBold: true },
+  { name: "Caveat", category: "Cute", hasBold: true },
+  { name: "Pacifico", category: "Cute", hasBold: false },
+  { name: "Patrick Hand", category: "Cute", hasBold: false },
+  { name: "Indie Flower", category: "Cute", hasBold: false },
+  { name: "Shadows Into Light", category: "Cute", hasBold: false },
+  { name: "Gloria Hallelujah", category: "Cute", hasBold: false },
+  { name: "Chewy", category: "Cute", hasBold: false },
+  { name: "Bubblegum Sans", category: "Cute", hasBold: false },
+  { name: "Schoolbell", category: "Cute", hasBold: false },
 ];
 
 // Susun satu URL Google Fonts untuk semua font tambahan sekaligus
